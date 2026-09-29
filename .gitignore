@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env*
+*.tfstate*
+.terraform/
+tfplan
+caddy/data/
+caddy/config/
