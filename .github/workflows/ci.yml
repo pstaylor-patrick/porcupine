@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Check tracked files for secrets
+        run: |
+          if git grep -nE 'PORCUPINE_RPC_PASSWORD=.+|AI_GATEWAY_API_KEY=.+|AKIA[0-9A-Z]{16}' -- ':!.github/workflows/ci.yml'; then
+            echo "Possible secret in tracked files" >&2
+            exit 1
+          fi
+
+  terraform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: hashFiles('infra/**/*.tf') != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+      - run: terraform fmt -check -recursive infra
+      - run: terraform init -backend=false && terraform validate
+        working-directory: infra
