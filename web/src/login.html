@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1f2a24" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Porcupine login</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/login.css" />
+  </head>
+  <body>
+    <main class="login">
+      <h1>Porcupine</h1>
+      <p id="error" class="error" role="alert">Wrong password, or too many attempts.</p>
+      <form method="post" action="/api/login">
+        <label for="password">Password</label>
+        <input id="password" type="password" name="password" autocomplete="current-password" required autofocus />
+        <button type="submit">Log in</button>
+      </form>
+    </main>
+  </body>
+</html>

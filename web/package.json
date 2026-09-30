@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.sw.json --noEmit",
+    "test": "vitest run",
+    "icons": "node scripts/icons.mjs"
   },
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.24.0",
+    "happy-dom": "^20.14.5"
   }
 }

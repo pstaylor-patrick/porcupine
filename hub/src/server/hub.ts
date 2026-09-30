@@ -110,7 +110,7 @@ export function createHub(opts: HubOptions): Hub {
       if (body === null || !passwordMatches(password, config.password)) {
         limiter.fail(ip);
         log(`login failed ip=${ip}`);
-        res.writeHead(303, { Location: "/login?error=1" }).end();
+        res.writeHead(303, { Location: "/login?error=1#error" }).end();
         return;
       }
       log(`login ok ip=${ip}`);

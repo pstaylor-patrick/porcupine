@@ -1,15 +1,52 @@
 import { build } from "esbuild";
-import { cpSync, mkdirSync, rmSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { basename } from "node:path";
 
 rmSync("dist", { recursive: true, force: true });
-mkdirSync("dist", { recursive: true });
-await build({
-  entryPoints: ["src/app.ts"],
+mkdirSync("dist/icons", { recursive: true });
+
+const app = await build({
+  entryPoints: ["src/app.ts", "src/styles.css"],
   bundle: true,
   format: "esm",
-  target: "es2022",
+  target: ["es2022", "safari16"],
   outdir: "dist",
+  entryNames: "[name]-[hash]",
   minify: true,
   sourcemap: true,
+  metafile: true,
 });
-cpSync("src/index.html", "dist/index.html");
+
+const outputs = Object.keys(app.metafile.outputs).filter((p) => !p.endsWith(".map"));
+const js = outputs.find((p) => p.endsWith(".js"));
+const css = outputs.find((p) => p.endsWith(".css"));
+if (!js || !css) throw new Error("missing bundle outputs");
+const jsName = basename(js);
+const cssName = basename(css);
+
+const html = readFileSync("src/index.html", "utf8")
+  .replace('src="/app.js"', `src="/${jsName}"`)
+  .replace('href="/styles.css"', `href="/${cssName}"`);
+if (!html.includes(jsName) || !html.includes(cssName)) throw new Error("index.html asset references not rewritten");
+writeFileSync("dist/index.html", html);
+
+cpSync("src/login.html", "dist/login.html");
+cpSync("src/login.css", "dist/login.css");
+cpSync("src/manifest.webmanifest", "dist/manifest.webmanifest");
+for (const f of ["icon-192.png", "icon-512.png", "maskable-512.png"]) copyFileSync(`src/icons/${f}`, `dist/icons/${f}`);
+copyFileSync("src/icons/apple-touch-icon-180.png", "dist/apple-touch-icon.png");
+
+const shell = ["/", `/${jsName}`, `/${cssName}`, "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/apple-touch-icon.png"];
+await build({
+  entryPoints: ["src/sw.ts"],
+  bundle: true,
+  format: "iife",
+  target: ["es2022", "safari16"],
+  outfile: "dist/sw.js",
+  minify: true,
+  define: {
+    __SHELL__: JSON.stringify(shell),
+    __VERSION__: JSON.stringify(jsName.replace(/^app-|\.js$/g, "") + "-" + cssName.replace(/^styles-|\.css$/g, "")),
+  },
+});
+console.log(`built ${jsName} ${cssName} sw.js`);

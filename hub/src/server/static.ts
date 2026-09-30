@@ -26,6 +26,7 @@ const TYPES: Record<string, string> = {
 export function isPublicPath(path: string): boolean {
   return (
     path === "/login" ||
+    path === "/login.css" ||
     path === "/sw.js" ||
     path === "/manifest.webmanifest" ||
     path === "/apple-touch-icon.png" ||
