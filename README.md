@@ -19,6 +19,22 @@ npm ci
 npm run typecheck && npm run lint && npm test && npm run build
 ```
 
+## Starting a named session
+
+One-time: `scripts/install-cli.sh` links `porcupine` into `~/.local/bin`.
+
+In a tmux window, cd into the repo you want Pi to work in and run it:
+
+```bash
+tmux new-session -s myrepo -c ~/code/org/myrepo   # or a new window in an existing session
+porcupine --name myrepo                            # name shown in the app's sidebar
+```
+
+Detach (Ctrl-b d) and close SSH; the session keeps running and appears in the
+app. Without `--name`, the name is the tmux `session:window`, else the folder
+name. Extra args after `--` go to pi, e.g. `porcupine --name x -- --model anthropic/claude-opus-5.5`.
+Ctrl-C in the pane ends the session. A VM restart clears all sessions.
+
 ## Runbook
 
 ### Start order
