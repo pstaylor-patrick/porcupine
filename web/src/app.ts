@@ -2,7 +2,19 @@
 import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
 import { TranscriptView } from "./render.js";
 import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./transcript.js";
-import { filterModels, parseModel, rowDetail, sheetState, vendorOf, type ModelInfo, type SheetState } from "./models.js";
+import {
+  filterModels,
+  groupByVendor,
+  loadRecent,
+  parseModel,
+  pushRecent,
+  rowDetail,
+  sheetState,
+  vendorOf,
+  type ModelInfo,
+  type RecentStorage,
+  type SheetState,
+} from "./models.js";
 import { Connection, type PiResponse, type ServerFrame, type SessionInfo } from "./ws.js";
 
 export function appTitle(): string {
@@ -214,7 +226,8 @@ export class App {
   }
 
   openSheet(): void {
-    this.open("sheet", "model-filter");
+    // Focusing the filter on iOS pops the keyboard over the list, so land on the heading.
+    this.open("sheet", "sheet-title");
     this.renderHeader();
     void this.loadModels();
   }
@@ -461,8 +474,10 @@ export class App {
 
   async setModel(m: ModelInfo): Promise<void> {
     const r = await this.conn.command({ type: "set_model", provider: m.provider, modelId: m.id });
-    if (r.success) this.model = parseModel(r.data) ?? m;
-    else this.notice("error", `set model: ${r.error ?? "failed"}`);
+    if (r.success) {
+      this.model = parseModel(r.data) ?? m;
+      pushRecent(recentStorage(), this.model.id);
+    } else this.notice("error", `set model: ${r.error ?? "failed"}`);
     this.renderHeader();
     this.renderModels();
   }
@@ -527,46 +542,75 @@ export class App {
   // ---- rendering ------------------------------------------------------
 
   renderModels(): void {
-    const list = $("model-list");
     const status = $("model-state");
+    const recent = $("model-recent");
+    const groups = $("model-groups");
     const state = sheetState({
       attached: this.conn.sessionId !== null,
       loading: this.modelsLoading,
       error: this.modelsError,
       models: this.models,
     });
-    status.hidden = state === "ready";
-    status.dataset.state = state;
+    const q = ($("model-filter") as HTMLInputElement).value.trim();
+    const shown = state === "ready" ? filterModels(this.models, q) : [];
+    const noMatches = state === "ready" && shown.length === 0;
+    status.hidden = state === "ready" && !noMatches;
+    status.dataset.state = noMatches ? "no-matches" : state;
     if (state === "error") status.textContent = `Could not load models: ${this.modelsError ?? "failed"}`;
     else if (state !== "ready") status.textContent = SHEET_MESSAGES[state];
-    else status.textContent = "";
-    const q = ($("model-filter") as HTMLInputElement).value;
-    const shown = filterModels(this.models, q).slice(0, 200);
-    list.replaceChildren(
-      ...shown.map((m) => {
-        const li = document.createElement("li");
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "model-option";
-        b.setAttribute("role", "option");
-        const current = this.model && this.model.id === m.id && this.model.provider === m.provider;
-        b.setAttribute("aria-selected", current ? "true" : "false");
-        const name = document.createElement("span");
-        name.className = "model-option-name";
-        name.textContent = m.name ?? m.id;
-        b.append(name);
-        const detail = rowDetail(m);
-        if (detail) {
-          const d = document.createElement("span");
-          d.className = "model-option-detail";
-          d.textContent = detail;
-          b.append(d);
-        }
-        b.addEventListener("click", () => void this.setModel(m));
-        li.append(b);
-        return li;
+    else status.textContent = noMatches ? "No matches" : "";
+
+    const byId = new Map(this.models.map((m) => [m.id, m]));
+    const recentModels = q || state !== "ready" ? [] : loadRecent(recentStorage()).flatMap((id) => byId.get(id) ?? []);
+    recent.hidden = recentModels.length === 0;
+    $("model-recent-list").replaceChildren(...recentModels.map((m) => this.modelOption(m)));
+
+    const currentVendor = this.model ? vendorOf(this.model.id, this.model.provider) : null;
+    groups.replaceChildren(
+      ...groupByVendor(shown).map((g) => {
+        const details = document.createElement("details");
+        details.className = "model-group";
+        details.dataset.vendor = g.vendor;
+        details.open = q !== "" || g.vendor === currentVendor;
+        const summary = document.createElement("summary");
+        summary.append(g.vendor);
+        const count = document.createElement("span");
+        count.className = "model-group-count";
+        count.textContent = `(${g.count})`;
+        summary.append(count);
+        const ul = document.createElement("ul");
+        ul.className = "model-list";
+        ul.setAttribute("role", "listbox");
+        ul.setAttribute("aria-label", g.vendor);
+        ul.append(...g.models.map((m) => this.modelOption(m)));
+        details.append(summary, ul);
+        return details;
       }),
     );
+  }
+
+  private modelOption(m: ModelInfo): HTMLLIElement {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "model-option";
+    b.setAttribute("role", "option");
+    const current = this.model !== null && this.model.id === m.id && this.model.provider === m.provider;
+    b.setAttribute("aria-selected", current ? "true" : "false");
+    const name = document.createElement("span");
+    name.className = "model-option-name";
+    name.textContent = m.name ?? m.id;
+    b.append(name);
+    const detail = rowDetail(m);
+    if (detail) {
+      const d = document.createElement("span");
+      d.className = "model-option-detail";
+      d.textContent = detail;
+      b.append(d);
+    }
+    b.addEventListener("click", () => void this.setModel(m));
+    li.append(b);
+    return li;
   }
 
   renderModelCard(): void {
@@ -712,3 +756,11 @@ export function start(): void {
 }
 
 if (typeof document !== "undefined" && document.getElementById("app")) start();
+
+function recentStorage(): RecentStorage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}

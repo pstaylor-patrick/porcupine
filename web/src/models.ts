@@ -97,3 +97,54 @@ export function rowDetail(m: ModelInfo): string {
   if (price) parts.push(price);
   return parts.join(" - ");
 }
+
+export interface VendorGroup {
+  vendor: string;
+  models: ModelInfo[];
+  count: number;
+}
+
+/** Groups models by vendor, sorted by vendor name; model order within a group is kept. */
+export function groupByVendor(models: readonly ModelInfo[]): VendorGroup[] {
+  const byVendor = new Map<string, ModelInfo[]>();
+  for (const m of models) {
+    const v = vendorOf(m.id, m.provider);
+    const list = byVendor.get(v);
+    if (list) list.push(m);
+    else byVendor.set(v, [m]);
+  }
+  return [...byVendor.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([vendor, list]) => ({ vendor, models: list, count: list.length }));
+}
+
+export const RECENT_KEY = "porcupine.recentModels";
+export const RECENT_SEED = "anthropic/claude-opus-5.5";
+export const RECENT_MAX = 8;
+
+export type RecentStorage = Pick<Storage, "getItem" | "setItem">;
+
+/** Recently used model ids, most recent first; the seed when storage is empty, broken or unavailable. */
+export function loadRecent(storage: RecentStorage | null | undefined): string[] {
+  try {
+    const raw = storage?.getItem(RECENT_KEY);
+    if (!raw) return [RECENT_SEED];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [RECENT_SEED];
+    const ids = parsed.filter((x): x is string => typeof x === "string" && x.length > 0);
+    return ids.length > 0 ? [...new Set(ids)].slice(0, RECENT_MAX) : [RECENT_SEED];
+  } catch {
+    return [RECENT_SEED];
+  }
+}
+
+/** Moves `key` to the front, dedupes, caps at RECENT_MAX and saves; storage errors are ignored. */
+export function pushRecent(storage: RecentStorage | null | undefined, key: string): string[] {
+  const next = [key, ...loadRecent(storage).filter((k) => k !== key)].slice(0, RECENT_MAX);
+  try {
+    storage?.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    // Private mode or quota: keep going without persistence.
+  }
+  return next;
+}

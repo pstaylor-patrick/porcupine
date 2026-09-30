@@ -67,7 +67,7 @@
     </section>
     <section id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" data-open="false">
       <div class="sheet-head">
-        <h2 id="sheet-title" class="sheet-title">Session settings</h2>
+        <h2 id="sheet-title" class="sheet-title" tabindex="-1">Session settings</h2>
         <button id="sheet-close" type="button" class="icon-button" aria-label="Close session settings">&#x2715;</button>
       </div>
       <div class="sheet-body">
@@ -77,7 +77,13 @@
           <label class="visually-hidden" for="model-filter">Filter models</label>
           <input id="model-filter" type="search" placeholder="Filter models" autocomplete="off" />
           <p id="model-state" class="model-state field-hint" role="status" aria-live="polite" hidden></p>
-          <ul id="model-list" class="model-list" role="listbox" aria-labelledby="model-label"></ul>
+          <div class="model-browser">
+            <section id="model-recent" class="model-recent" aria-labelledby="model-recent-title" hidden>
+              <h3 id="model-recent-title" class="model-section-title">Recently used</h3>
+              <ul id="model-recent-list" class="model-list" role="listbox" aria-labelledby="model-recent-title"></ul>
+            </section>
+            <div id="model-groups" class="model-groups"></div>
+          </div>
         </div>
         <div class="field">
           <label class="field-label" for="thinking-select">Thinking level</label>

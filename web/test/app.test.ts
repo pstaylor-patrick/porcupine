@@ -207,7 +207,7 @@ describe("app", () => {
     expect(byId("sheet").dataset.open).toBe("true");
     expect(byId("sheet-button").getAttribute("aria-expanded")).toBe("true");
     expect(byId("sheet").getAttribute("role")).toBe("dialog");
-    expect(document.activeElement?.id).toBe("model-filter");
+    expect(document.activeElement?.id).toBe("sheet-title");
     byId("sheet-close").click();
     expect(byId("sheet").dataset.open).toBe("false");
     expect(document.activeElement?.id).toBe("sheet-button");
@@ -249,11 +249,11 @@ describe("app", () => {
     });
     conn.sessionId = "s1";
     app.openSheet();
-    await vi.waitFor(() => expect(document.querySelectorAll(".model-option")).toHaveLength(2));
+    await vi.waitFor(() => expect(document.querySelectorAll("#model-groups .model-option")).toHaveLength(2));
     const filter = byId("model-filter") as HTMLInputElement;
     filter.value = "gpt";
     filter.dispatchEvent(new Event("input"));
-    const options = document.querySelectorAll<HTMLButtonElement>(".model-option");
+    const options = document.querySelectorAll<HTMLButtonElement>("#model-groups .model-option");
     expect(options).toHaveLength(1);
     options[0]?.click();
     const select = byId("thinking-select") as HTMLSelectElement;
@@ -266,6 +266,57 @@ describe("app", () => {
       { type: "set_thinking_level", level: "high" },
     ]);
     await vi.waitFor(() => expect(document.querySelector("#model-card .model-card-name")?.textContent).toBe("openai/gpt-5"));
+  });
+
+  it("groups models by vendor, lists recent first and filters across groups", async () => {
+    localStorage.clear();
+    const { app, conn } = setup({
+      get_state: { success: true, data: { model: { id: "openai/gpt-5", provider: "g" }, thinkingLevel: "low" } },
+      get_available_models: {
+        success: true,
+        data: {
+          models: [
+            { provider: "g", id: "anthropic/claude-opus-5.5" },
+            { provider: "g", id: "anthropic/claude-sonnet-5.5" },
+            { provider: "g", id: "openai/gpt-5" },
+            { provider: "g", id: "zai/glm-5" },
+          ],
+        },
+      },
+    });
+    conn.sessionId = "s1";
+    app.model = { id: "openai/gpt-5", provider: "g" };
+    app.openSheet();
+    await vi.waitFor(() => expect(document.querySelectorAll("#model-groups details")).toHaveLength(3));
+    const groups = [...document.querySelectorAll<HTMLDetailsElement>("#model-groups details")];
+    expect(groups.map((d) => d.querySelector("summary")?.textContent)).toEqual(["anthropic(2)", "openai(1)", "zai(1)"]);
+    expect(groups.map((d) => d.open)).toEqual([false, true, false]);
+    expect(byId("model-recent").hidden).toBe(false);
+    expect([...document.querySelectorAll("#model-recent .model-option-name")].map((n) => n.textContent)).toEqual(["anthropic/claude-opus-5.5"]);
+
+    const filter = byId("model-filter") as HTMLInputElement;
+    filter.value = "claude";
+    filter.dispatchEvent(new Event("input"));
+    expect(byId("model-recent").hidden).toBe(true);
+    const open = [...document.querySelectorAll<HTMLDetailsElement>("#model-groups details")];
+    expect(open.map((d) => [d.dataset.vendor, d.open])).toEqual([["anthropic", true]]);
+
+    filter.value = "nothing-here";
+    filter.dispatchEvent(new Event("input"));
+    expect(document.querySelectorAll("#model-groups details")).toHaveLength(0);
+    expect(byId("model-state").textContent).toBe("No matches");
+    expect(byId("model-state").hidden).toBe(false);
+
+    filter.value = "";
+    filter.dispatchEvent(new Event("input"));
+    expect(document.querySelectorAll("#model-groups details")).toHaveLength(3);
+    expect(byId("model-state").hidden).toBe(true);
+
+    document.querySelector<HTMLButtonElement>('#model-groups details[data-vendor="zai"] .model-option')?.click();
+    await vi.waitFor(() =>
+      expect([...document.querySelectorAll("#model-recent .model-option-name")].map((n) => n.textContent)).toEqual(["zai/glm-5", "anthropic/claude-opus-5.5"]),
+    );
+    localStorage.clear();
   });
 
   it("shows distinct model sheet states", async () => {

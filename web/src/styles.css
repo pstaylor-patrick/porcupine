@@ -205,7 +205,16 @@ select {
 .model-card-vendor, .model-card-detail { font-size: 0.875rem; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
 .model-card[data-empty="true"] .model-card-name { font-weight: 400; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
 .sheet input[type="search"] { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 16px; }
-.model-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; max-height: 36dvh; border: 1px solid var(--line); border-radius: 10px; }
+.model-browser { overflow-y: auto; max-height: 40dvh; border: 1px solid var(--line); border-radius: 10px; }
+.model-browser:has(.model-recent[hidden]):has(.model-groups:empty) { display: none; }
+.model-list { list-style: none; margin: 0; padding: 0; }
+.model-section-title { margin: 0; padding: 8px 10px 4px; font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
+.model-recent { border-bottom: 1px solid var(--line); }
+.model-group + .model-group { border-top: 1px solid var(--line); }
+.model-group > summary { display: flex; align-items: center; min-height: 44px; padding: 0 10px; font-weight: 600; cursor: pointer; }
+.model-group > summary:hover, .model-group > summary:focus-visible { background: var(--code); }
+.model-group > summary:focus-visible { outline-offset: -2px; }
+.model-group-count { margin-left: 6px; font-weight: 400; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
 .model-option { display: flex; flex-direction: column; justify-content: center; gap: 2px; width: 100%; min-height: 44px; text-align: left; background: none; border: 0; padding: 8px 10px; overflow-wrap: anywhere; cursor: pointer; }
 .model-option-name { overflow-wrap: anywhere; }
 .model-option-detail { font-size: 0.8125rem; font-weight: 400; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
@@ -339,7 +348,7 @@ details > :not(summary) { padding: 0 12px 10px; }
     padding-top: calc(env(safe-area-inset-top) + 8px);
     transform: translateX(100%);
   }
-  .model-list { max-height: 50dvh; }
+  .model-browser { max-height: 50dvh; }
   .composer { padding-left: max(var(--gutter), calc((100% - 900px) / 2 + var(--gutter))); padding-right: max(var(--gutter), calc((100% - 900px) / 2 + var(--gutter))); }
 }
 
