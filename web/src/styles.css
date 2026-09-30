@@ -74,7 +74,7 @@ body {
 }
 button, select, input, textarea { font: inherit; color: inherit; }
 h1, h2, h3, h4, h5, h6 { font-family: inherit; color: var(--title); }
-code, pre, .composer textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.9em; }
+code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.9em; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .layout {
