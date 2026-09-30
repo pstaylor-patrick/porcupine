@@ -32,8 +32,7 @@ phone / laptop ──HTTPS──> reverse proxy ──> porcupine-hub ──unix
 - A private network between the host and your devices (Tailscale, WireGuard or a LAN)
 - HTTPS in front of the hub. Service workers and `Secure` cookies need it;
   [examples/Caddyfile](examples/Caddyfile) shows one way.
-- An OpenRouter API key. Anthropic and OpenAI keys are optional. The default model is
-  Claude Opus 5.5 when `ANTHROPIC_API_KEY` is set, else DeepSeek V4 Pro, with low thinking.
+- An OpenRouter API key. Anthropic and OpenAI keys are optional.
 
 ## Install
 
@@ -64,7 +63,7 @@ Settings come from the process environment or the env file
 | `OPENROUTER_API_KEY` | required | OpenRouter key; serves every model not routed direct |
 | `ANTHROPIC_API_KEY` | | Optional; serves Anthropic models from the Anthropic API |
 | `OPENAI_API_KEY` | | Optional; serves OpenAI models from the OpenAI API |
-| `PORCUPINE_MODEL` | see above | Default model for new sessions, as an OpenRouter-style `vendor/model` id; routed like any other |
+| `PORCUPINE_MODEL` | | Overrides the default model for new sessions, as a `vendor/model` id; routed like any other |
 | `PORCUPINE_RUNTIME_DIR` | `$XDG_RUNTIME_DIR/porcupine` | Session sockets |
 
 Each model comes from exactly one provider. Anthropic models come only from the
@@ -89,7 +88,8 @@ tmux new-session -s myrepo -c ~/code/myrepo 'porcupine --name myrepo'
 It appears in the app's sidebar. Without `--name` the name is the tmux
 `session:window`, else the folder name. Arguments after `--` go to pi, e.g.
 `porcupine --name x -- --model anthropic/claude-sonnet-5.5 --thinking high`.
-Ctrl-C in the pane ends the session; a reboot clears them all.
+Each pane logs the model it starts on, and the app shows the current model in
+settings. Ctrl-C in the pane ends the session; a reboot clears them all.
 
 ## Optional: DNS and TLS on AWS
 
