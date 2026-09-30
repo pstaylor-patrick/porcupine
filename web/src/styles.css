@@ -60,17 +60,21 @@
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+@font-face { font-family: "TeX Gyre Schola"; src: url("/fonts/texgyreschola-regular-latin.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "TeX Gyre Schola"; src: url("/fonts/texgyreschola-italic-latin.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "TeX Gyre Schola"; src: url("/fonts/texgyreschola-bold-latin.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body {
   background: var(--bg);
   color: var(--fg);
-  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 16px/1.5 "TeX Gyre Schola", "Century Schoolbook", "New Century Schoolbook", Georgia, serif;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
 }
 button, select, input, textarea { font: inherit; color: inherit; }
-code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.9em; }
+h1, h2, h3, h4, h5, h6 { font-family: inherit; color: var(--title); }
+code, pre, .composer textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.9em; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .layout {

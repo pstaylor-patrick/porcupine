@@ -4,7 +4,10 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --bg: var(--plum); --fg: var(--cream); --title: var(--pink); --focus: var(--lilac); --accent: var(--lilac); --accent-fg: var(--plum); --line: var(--crayon); } }
 :root[data-theme="dark"] { color-scheme: dark; --bg: var(--plum); --fg: var(--cream); --title: var(--pink); --focus: var(--lilac); --accent: var(--lilac); --accent-fg: var(--plum); --line: var(--crayon); }
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--fg); font: 17px/1.4 system-ui, -apple-system, sans-serif;
+@font-face { font-family: "TeX Gyre Schola"; src: url("/fonts/texgyreschola-regular-latin.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "TeX Gyre Schola"; src: url("/fonts/texgyreschola-italic-latin.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "TeX Gyre Schola"; src: url("/fonts/texgyreschola-bold-latin.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--fg); font: 17px/1.5 "TeX Gyre Schola", "Century Schoolbook", "New Century Schoolbook", Georgia, serif;
   display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
 .login { width: min(360px, 100%); }
 h1 { font-size: 28px; margin: 0 0 16px; color: var(--title); }

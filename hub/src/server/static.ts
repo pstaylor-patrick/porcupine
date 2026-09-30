@@ -19,6 +19,7 @@ const TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
   ".map": "application/json",
+  ".woff2": "font/woff2",
   ".txt": "text/plain; charset=utf-8",
 };
 
@@ -32,7 +33,8 @@ export function isPublicPath(path: string): boolean {
     path === "/manifest.webmanifest" ||
     path === "/apple-touch-icon.png" ||
     path === "/favicon.ico" ||
-    path.startsWith("/icons/")
+    path.startsWith("/icons/") ||
+    path.startsWith("/fonts/")
   );
 }
 

@@ -42,6 +42,8 @@ beforeEach(async () => {
   mkdirSync(runtimeDir, { mode: 0o700 });
   mkdirSync(join(dir, "web"));
   writeFileSync(join(dir, "web", "index.html"), "<!doctype html><title>app</title>");
+  mkdirSync(join(dir, "web", "fonts"));
+  writeFileSync(join(dir, "web", "fonts", "texgyreschola-regular-latin.woff2"), "wOF2");
   session = null;
   hub = createHub({ config: config(), log: () => undefined, rescanMs: 100 });
   const { port } = await hub.listen();
@@ -150,6 +152,13 @@ describe("hub HTTP and auth", () => {
     const app = await fetch(`${base}/`, { headers: { Cookie: cookie() } });
     expect(await app.text()).toContain("<title>app</title>");
     expect(app.headers.get("cache-control")).toBe("no-cache");
+  });
+
+  it("serves /fonts/ woff2 without a cookie as font/woff2", async () => {
+    expect(isPublicPath("/fonts/texgyreschola-regular-latin.woff2")).toBe(true);
+    const r = await fetch(`${base}/fonts/texgyreschola-regular-latin.woff2`, { redirect: "manual" });
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toBe("font/woff2");
   });
 
   it("serves /theme-init.js without a cookie", async () => {

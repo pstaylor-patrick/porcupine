@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { basename } from "node:path";
 
@@ -24,6 +24,7 @@ const app = await build({
   minify: true,
   sourcemap: true,
   metafile: true,
+  external: ["/fonts/*"],
   define: { __APP_VERSION__: JSON.stringify(appVersion()) },
 });
 
@@ -43,11 +44,13 @@ writeFileSync("dist/index.html", html);
 cpSync("src/login.html", "dist/login.html");
 cpSync("src/login.css", "dist/login.css");
 cpSync("src/theme-init.js", "dist/theme-init.js");
+cpSync("src/fonts", "dist/fonts", { recursive: true });
+const fonts = readdirSync("src/fonts").filter((f) => f.endsWith(".woff2")).map((f) => `/fonts/${f}`);
 cpSync("src/manifest.webmanifest", "dist/manifest.webmanifest");
 for (const f of ["icon-192.png", "icon-512.png", "maskable-512.png"]) copyFileSync(`src/icons/${f}`, `dist/icons/${f}`);
 copyFileSync("src/icons/apple-touch-icon-180.png", "dist/apple-touch-icon.png");
 
-const shell = ["/", `/${jsName}`, `/${cssName}`, "/theme-init.js", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/apple-touch-icon.png"];
+const shell = ["/", `/${jsName}`, `/${cssName}`, "/theme-init.js", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/apple-touch-icon.png", ...fonts];
 await build({
   entryPoints: ["src/sw.ts"],
   bundle: true,
