@@ -112,3 +112,7 @@ your machine.
 - Cookie secret: replace `PORCUPINE_COOKIE_SECRET`, restart the hub. Every browser is logged out.
 - Password: change `PORCUPINE_RPC_PASSWORD`, restart the hub.
 - DNS-01 key: `scripts/caddy-keys.sh`, restart the proxy, then delete the old key with `aws iam delete-access-key`.
+
+## License
+
+[MIT](LICENSE)
