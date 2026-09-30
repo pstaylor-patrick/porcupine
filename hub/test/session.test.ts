@@ -100,7 +100,7 @@ describe("porcupine session", () => {
     const envFile = join(tmpdir(), `fake-env-${process.pid}.json`);
     await start({ FAKE_PI_ARGS_FILE: argsFile, FAKE_PI_ENV_FILE: envFile, PORCUPINE_RPC_PASSWORD: "hunter2" });
     const args = JSON.parse(readFileSync(argsFile, "utf8"));
-    expect(args).toEqual(["--mode", "rpc", "--provider", "openrouter", "--model", "anthropic/claude-opus-5.5", "--thinking", "low"]);
+    expect(args).toEqual(["--mode", "rpc", "--provider", "vercel-ai-gateway", "--model", "anthropic/claude-opus-5.5", "--thinking", "low"]);
     const env = JSON.parse(readFileSync(envFile, "utf8")) as Record<string, string>;
     expect(env.AI_GATEWAY_API_KEY).toBe("vk");
     expect(env.PORCUPINE_RPC_PASSWORD).toBeUndefined();

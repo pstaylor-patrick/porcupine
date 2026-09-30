@@ -1,9 +1,23 @@
 import { execFileSync } from "node:child_process";
 import { basename } from "node:path";
 
-export const DEFAULT_PROVIDER = "openrouter";
+/** Fallback provider when no override and no OpenRouter key is present. */
+export const DEFAULT_PROVIDER = "vercel-ai-gateway";
 export const DEFAULT_MODEL = "anthropic/claude-opus-5.5";
 export const DEFAULT_THINKING = "low";
+
+/** Providers porcupine knows how to key, with display labels. */
+export const PROVIDERS: Readonly<Record<string, string>> = {
+  openrouter: "OpenRouter",
+  "vercel-ai-gateway": "Vercel AI Gateway",
+};
+
+const OPENROUTER_KEY_PREFIX = "sk-or-";
+
+export interface PiDefaults {
+  provider: string;
+  model: string;
+}
 
 /** Keys that must never reach the pi child. */
 export const SECRET_KEYS = ["PORCUPINE_RPC_PASSWORD", "PORCUPINE_COOKIE_SECRET"] as const;
@@ -41,10 +55,25 @@ function hasFlag(args: string[], flag: string): boolean {
   return args.some((a) => a === flag || a.startsWith(`${flag}=`));
 }
 
-export function buildPiArgs(userArgs: string[], extensions: string[] = []): string[] {
+/** Provider from the child env: PORCUPINE_PROVIDER, else openrouter when keyed, else vercel-ai-gateway. */
+export function resolveDefaultProvider(env: NodeJS.ProcessEnv): string {
+  if (env.PORCUPINE_PROVIDER) return env.PORCUPINE_PROVIDER;
+  if (env.OPENROUTER_API_KEY) return "openrouter";
+  return DEFAULT_PROVIDER;
+}
+
+export function resolveDefaults(env: NodeJS.ProcessEnv): PiDefaults {
+  return { provider: resolveDefaultProvider(env), model: env.PORCUPINE_MODEL || DEFAULT_MODEL };
+}
+
+export function buildPiArgs(
+  userArgs: string[],
+  extensions: string[] = [],
+  defaults: PiDefaults = { provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL },
+): string[] {
   const out = ["--mode", "rpc", ...extensions.flatMap((e) => ["--extension", e])];
   if (!hasFlag(userArgs, "--provider") && !hasFlag(userArgs, "--model")) {
-    out.push("--provider", DEFAULT_PROVIDER, "--model", DEFAULT_MODEL);
+    out.push("--provider", defaults.provider, "--model", defaults.model);
   }
   if (!hasFlag(userArgs, "--thinking")) out.push("--thinking", DEFAULT_THINKING);
   return [...out, ...userArgs];
@@ -55,7 +84,12 @@ export function buildChildEnv(processEnv: NodeJS.ProcessEnv, fileEnv: Record<str
   const env: NodeJS.ProcessEnv = { ...processEnv };
   const key = fileEnv.VERCEL_AI_GATEWAY_API_KEY ?? processEnv.VERCEL_AI_GATEWAY_API_KEY;
   if (!env.AI_GATEWAY_API_KEY && key) env.AI_GATEWAY_API_KEY = key;
-  if (!env.OPENROUTER_API_KEY && fileEnv.OPENROUTER_API_KEY) env.OPENROUTER_API_KEY = fileEnv.OPENROUTER_API_KEY;
+  const orKey = fileEnv.OPENROUTER_API_KEY ?? processEnv.OPENROUTER_API_KEY;
+  if (!env.OPENROUTER_API_KEY && orKey) env.OPENROUTER_API_KEY = orKey;
+  // An OpenRouter key under OPENAI_API_KEY would be sent to OpenAI by pi: move it, never pass it on.
+  const openaiKey = fileEnv.OPENAI_API_KEY ?? env.OPENAI_API_KEY;
+  if (openaiKey?.startsWith(OPENROUTER_KEY_PREFIX) && !env.OPENROUTER_API_KEY) env.OPENROUTER_API_KEY = openaiKey;
+  if (env.OPENAI_API_KEY?.startsWith(OPENROUTER_KEY_PREFIX)) delete env.OPENAI_API_KEY;
   for (const k of SECRET_KEYS) delete env[k];
   return env;
 }

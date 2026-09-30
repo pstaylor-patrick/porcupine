@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defaultEnvFile, resolveRuntimeDir } from "../shared/paths.js";
-import { buildChildEnv, buildPiArgs, parseCliArgs, parseEnvFile, resolveName } from "./args.js";
+import { buildChildEnv, buildPiArgs, parseCliArgs, parseEnvFile, resolveDefaults, resolveName } from "./args.js";
 import { limitsFromEnv } from "./event-log.js";
 import { createLogger } from "./log.js";
 import { readPinnedPiVersion, startSession } from "./session.js";
@@ -31,12 +31,13 @@ async function main(): Promise<void> {
   }
   const cwd = process.cwd();
   const envFile = defaultEnvFile(process.env);
+  const childEnv = buildChildEnv(process.env, loadEnvFile(envFile));
   const session = await startSession({
     name: resolveName({ explicit: args.name, env: process.env, cwd }),
     cwd,
     piBin: process.env.PORCUPINE_PI_BIN ?? "pi",
-    piArgs: buildPiArgs(args.piArgs, [ASK_EXTENSION]),
-    childEnv: buildChildEnv(process.env, loadEnvFile(envFile)),
+    piArgs: buildPiArgs(args.piArgs, [ASK_EXTENSION], resolveDefaults(childEnv)),
+    childEnv,
     runtimeDir: resolveRuntimeDir({ env: process.env }),
     log,
     limits: limitsFromEnv(process.env.PORCUPINE_EVENT_BUFFER),
