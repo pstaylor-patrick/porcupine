@@ -23,7 +23,8 @@ fi
 
 die() { echo "smoke: FAIL $*" >&2; exit 1; }
 
-password="$(grep -E '^PORCUPINE_RPC_PASSWORD=' "$env_file" | head -n1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')"
+password_key="PORCUPINE_RPC_PASSWORD"
+password="$(grep -E "^${password_key}=" "$env_file" | head -n1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')"
 [ -n "$password" ] || die "PORCUPINE_RPC_PASSWORD missing from $env_file"
 
 [ -f hub/dist/cli/main.js ] || die "hub not built; run npm run build"
