@@ -23,12 +23,17 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
-      - name: Check tracked files for secrets
-        run: |
-          if git grep -nE 'PORCUPINE_RPC_PASSWORD=.+|AI_GATEWAY_API_KEY=.+|AKIA[0-9A-Z]{16}' -- ':!.github/workflows/ci.yml'; then
-            echo "Possible secret in tracked files" >&2
-            exit 1
-          fi
+      - run: npm audit --omit=dev --audit-level=high
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan full history
+        run: docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.28.0 git --no-banner --redact --verbose
 
   terraform:
     runs-on: ubuntu-latest

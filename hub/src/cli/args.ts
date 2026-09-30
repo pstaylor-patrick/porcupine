@@ -2,7 +2,8 @@ import { execFileSync } from "node:child_process";
 import { basename } from "node:path";
 
 export const DEFAULT_PROVIDER = "vercel-ai-gateway";
-export const DEFAULT_MODEL = "anthropic/claude-sonnet-5.5";
+export const DEFAULT_MODEL = "anthropic/claude-opus-5.5";
+export const DEFAULT_THINKING = "low";
 
 /** Keys that must never reach the pi child. */
 export const SECRET_KEYS = ["PORCUPINE_RPC_PASSWORD", "PORCUPINE_COOKIE_SECRET"] as const;
@@ -45,6 +46,7 @@ export function buildPiArgs(userArgs: string[], extensions: string[] = []): stri
   if (!hasFlag(userArgs, "--provider") && !hasFlag(userArgs, "--model")) {
     out.push("--provider", DEFAULT_PROVIDER, "--model", DEFAULT_MODEL);
   }
+  if (!hasFlag(userArgs, "--thinking")) out.push("--thinking", DEFAULT_THINKING);
   return [...out, ...userArgs];
 }
 

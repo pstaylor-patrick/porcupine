@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars (untracked).
+zone_name = "example.com"
+fqdn      = "porcupine.example.com"
+# host_ipv4 is normally passed by scripts/tf.sh from PORCUPINE_HOST_IP or `tailscale ip -4`.

@@ -1,0 +1,17 @@
+# Example Caddy site for the hub. Any TLS reverse proxy that forwards
+# WebSocket upgrades works the same way.
+#
+# Public hostname, private address: point porcupine.example.com at the hub
+# host's private IP (Tailscale, WireGuard or LAN). The name resolves publicly
+# but only devices on your network can connect. Let's Encrypt cannot reach a
+# private IP, so use a DNS-01 challenge (this needs Caddy built with your DNS
+# provider's module, e.g. caddy-dns/route53; infra/ has a matching IAM user).
+
+porcupine.example.com {
+	tls you@example.com {
+		dns route53
+	}
+	header Strict-Transport-Security "max-age=31536000"
+	# The hub listens on PORCUPINE_HUB_ADDR (default 127.0.0.1:8787).
+	reverse_proxy 127.0.0.1:8787
+}

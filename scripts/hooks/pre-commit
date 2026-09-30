@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Blocks commits that add secrets or deployment-specific strings.
+# Enabled by install.rb (git config core.hooksPath scripts/hooks).
+set -euo pipefail
+
+status=0
+
+# 1. gitleaks on staged changes, via the binary or Docker.
+if command -v gitleaks >/dev/null; then
+  gitleaks git --staged --no-banner --redact || status=1
+elif command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+  docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.28.0 \
+    git --staged --no-banner --redact || status=1
+else
+  echo "pre-commit: gitleaks not found (install it or Docker); skipping secret scan" >&2
+fi
+
+# 2. Local denylist: strings that identify your deployment (domain, IPs,
+#    bucket names). One per line, # for comments. Never committed.
+denylist="${PORCUPINE_DENYLIST:-${XDG_CONFIG_HOME:-$HOME/.config}/porcupine/denylist}"
+if [[ -r "$denylist" ]]; then
+  patterns=$(grep -vE '^\s*(#|$)' "$denylist" || true)
+  if [[ -n "$patterns" ]]; then
+    if hits=$(git diff --cached -U0 --no-color | grep -E '^\+[^+]' | grep -nFf <(printf '%s\n' "$patterns")); then
+      echo "pre-commit: staged lines match your denylist ($denylist):" >&2
+      echo "$hits" | cut -c1-200 >&2
+      status=1
+    fi
+  fi
+fi
+
+if [[ $status -ne 0 ]]; then
+  echo "Commit blocked. Remove the matches, or bypass once with git commit --no-verify if you are sure." >&2
+fi
+exit $status

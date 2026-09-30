@@ -1,10 +1,7 @@
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveRuntimeDir } from "../shared/paths.js";
+import { defaultEnvFile, resolveRuntimeDir } from "../shared/paths.js";
 import { readEnvFile } from "./env-file.js";
 
-export const PROD_ORIGIN = "https://porcupine.pstaylor.net";
 export const DEFAULT_COOKIE_TTL_SEC = 30 * 24 * 60 * 60;
 
 export interface HubConfig {
@@ -41,8 +38,7 @@ export interface LoadConfigInput {
 
 export function loadConfig(input: LoadConfigInput): HubConfig {
   const { env } = input;
-  const home = input.home ?? homedir();
-  const envFile = env.PORCUPINE_ENV_FILE ?? join(home, "1-areas/pst/porcupine/secrets/.env");
+  const envFile = defaultEnvFile(env, input.home);
   let secrets: Record<string, string>;
   try {
     secrets = (input.readEnv ?? readEnvFile)(envFile);
@@ -65,7 +61,14 @@ export function loadConfig(input: LoadConfigInput): HubConfig {
   }
   const ttl = env.PORCUPINE_COOKIE_TTL_SEC ? Number(env.PORCUPINE_COOKIE_TTL_SEC) : DEFAULT_COOKIE_TTL_SEC;
   if (!Number.isInteger(ttl) || ttl <= 0) throw new ConfigError("invalid PORCUPINE_COOKIE_TTL_SEC");
-  const origins = [PROD_ORIGIN];
+  // The public URL browsers load the app from; WebSocket upgrades from any other origin are refused.
+  const origins = (env.PORCUPINE_ORIGIN ?? secrets.PORCUPINE_ORIGIN ?? "")
+    .split(",")
+    .map((o) => o.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+  if (origins.length === 0 && !dev) {
+    throw new ConfigError(`PORCUPINE_ORIGIN is not set. Add the URL you open the app at to ${envFile}, e.g. PORCUPINE_ORIGIN=https://porcupine.example.com`);
+  }
   if (dev) origins.push(`http://localhost:${port}`, `http://127.0.0.1:${port}`);
   return {
     host,
@@ -75,7 +78,7 @@ export function loadConfig(input: LoadConfigInput): HubConfig {
     password,
     cookieSecret,
     cookieTtlSec: ttl,
-    runtimeDir: resolveRuntimeDir({ env, home }),
+    runtimeDir: resolveRuntimeDir(input.home ? { env, home: input.home } : { env }),
     webDist: env.PORCUPINE_WEB_DIST ?? fileURLToPath(new URL("../../../web/dist", import.meta.url)),
   };
 }

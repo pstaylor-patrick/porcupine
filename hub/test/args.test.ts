@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_MODEL,
   DEFAULT_PROVIDER,
+  DEFAULT_THINKING,
   buildChildEnv,
   buildPiArgs,
   parseCliArgs,
@@ -12,12 +13,14 @@ import {
 import { resolveRuntimeDir } from "../src/shared/paths.js";
 
 describe("buildPiArgs", () => {
-  it("adds the default provider and model when neither is given", () => {
-    expect(buildPiArgs([])).toEqual(["--mode", "rpc", "--provider", DEFAULT_PROVIDER, "--model", DEFAULT_MODEL]);
+  it("adds the default provider, model and thinking level when none is given", () => {
+    expect(buildPiArgs([])).toEqual([
+      "--mode", "rpc", "--provider", DEFAULT_PROVIDER, "--model", DEFAULT_MODEL, "--thinking", DEFAULT_THINKING,
+    ]);
   });
-  it("does not add defaults when --provider or --model is given", () => {
-    expect(buildPiArgs(["--model", "x/y"])).toEqual(["--mode", "rpc", "--model", "x/y"]);
-    expect(buildPiArgs(["--provider=openai"])).toEqual(["--mode", "rpc", "--provider=openai"]);
+  it("does not add a default the user overrode", () => {
+    expect(buildPiArgs(["--model", "x/y"])).toEqual(["--mode", "rpc", "--thinking", "low", "--model", "x/y"]);
+    expect(buildPiArgs(["--provider=openai", "--thinking=high"])).toEqual(["--mode", "rpc", "--provider=openai", "--thinking=high"]);
   });
   it("keeps other user args after the defaults", () => {
     expect(buildPiArgs(["--thinking", "high"]).slice(-2)).toEqual(["--thinking", "high"]);

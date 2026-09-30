@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Create an access key for the Caddy DNS-01 IAM user and write it to the
-# secrets dir (never the repo). Rotation: delete the old key, rerun, restart Caddy.
+# config dir, never the repo. Rotation: delete the old key, rerun, restart Caddy.
 set -euo pipefail
 
 user="porcupine-caddy-dns01"
-profile="${AWS_PROFILE:-personal}"
-out="${PORCUPINE_CADDY_ENV:-$HOME/1-areas/pst/porcupine/secrets/caddy.env}"
+profile="${AWS_PROFILE:-default}"
+out="${PORCUPINE_CADDY_ENV:-${XDG_CONFIG_HOME:-$HOME/.config}/porcupine/caddy.env}"
 
 count="$(aws iam list-access-keys --user-name "$user" --profile "$profile" \
   --query 'length(AccessKeyMetadata)' --output text)"

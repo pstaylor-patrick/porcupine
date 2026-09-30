@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end smoke: real pi through the hub at https://porcupine.pstaylor.net.
+# End-to-end smoke: real pi through the hub at PORCUPINE_ORIGIN.
 # Starts `porcupine --name smoke` in a detached tmux session, runs
 # scripts/smoke-client.mjs against it, kills the session and checks the hub
 # prunes its socket. Requires the hub to be running (tmux session porcupine-hub)
@@ -8,8 +8,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 repo="$PWD"
 
-env_file="${PORCUPINE_ENV_FILE:-$HOME/1-areas/pst/porcupine/secrets/.env}"
-base_url="${SMOKE_BASE_URL:-https://porcupine.pstaylor.net}"
+env_file="${PORCUPINE_ENV_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/porcupine/.env}"
+file_origin="$(grep -E '^PORCUPINE_ORIGIN=' "$env_file" 2>/dev/null | head -n1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' | cut -d, -f1)"
+base_url="${SMOKE_BASE_URL:-${PORCUPINE_ORIGIN:-$file_origin}}"
 name="smoke"
 tmux_session="porcupine-smoke-$$"
 runtime_dir="${PORCUPINE_RUNTIME_DIR:-}"

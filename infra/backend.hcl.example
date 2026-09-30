@@ -1,0 +1,3 @@
+# Copy to backend.hcl (untracked) and set your state bucket.
+bucket = "my-terraform-state"
+region = "us-east-1"

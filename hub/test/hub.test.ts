@@ -11,7 +11,7 @@ import type { HubConfig } from "../src/server/config.js";
 import { createHub, type Hub } from "../src/server/hub.js";
 
 const FAKE_PI = fileURLToPath(new URL("./fixtures/fake-pi.mjs", import.meta.url));
-const ORIGIN = "https://porcupine.pstaylor.net";
+const ORIGIN = "https://porcupine.example.com";
 const SECRET = "c".repeat(64);
 
 let dir: string;
