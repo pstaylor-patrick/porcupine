@@ -33,12 +33,16 @@ jobs:
   terraform:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: hashFiles('infra/**/*.tf') != ''
     steps:
       - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - id: tf
+        run: echo "present=$(ls infra/*.tf >/dev/null 2>&1 && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - if: steps.tf.outputs.present == 'true'
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.5
-      - run: terraform fmt -check -recursive infra
-      - run: terraform init -backend=false && terraform validate
+      - if: steps.tf.outputs.present == 'true'
+        run: terraform fmt -check -recursive infra
+      - if: steps.tf.outputs.present == 'true'
+        run: terraform init -backend=false && terraform validate
         working-directory: infra
