@@ -139,6 +139,13 @@ export class App {
 
   bind(): void {
     const form = $("composer") as HTMLFormElement;
+    const jump = $("jump-bottom");
+    // pointerdown default would blur the input and drop the keyboard.
+    jump.addEventListener("pointerdown", (e) => e.preventDefault());
+    jump.addEventListener("click", () => {
+      this.main.scrollTo({ top: this.main.scrollHeight, behavior: "smooth" });
+    });
+    this.main.addEventListener("scroll", () => this.syncJump(), { passive: true });
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       void this.send();
@@ -774,6 +781,12 @@ export class App {
     $("empty").hidden = !this.sessionsLoaded || this.conn.sessionId !== null;
   }
 
+  /** Shows the jump button whenever the thread is scrolled up from the bottom. */
+  syncJump(): void {
+    const gap = this.main.scrollHeight - this.main.scrollTop - this.main.clientHeight;
+    $("jump-bottom").hidden = gap < 80;
+  }
+
   render(): void {
     const nearBottom = this.main.scrollHeight - this.main.scrollTop - this.main.clientHeight < 120;
     this.view.render(this.t);
@@ -784,6 +797,7 @@ export class App {
     document.body.classList.toggle("is-streaming", streaming);
     this.syncEmpty();
     if (nearBottom) this.main.scrollTop = this.main.scrollHeight;
+    this.syncJump();
   }
 }
 

@@ -46,6 +46,41 @@ export function inline(text: string): DocumentFragment {
   return frag;
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+// Phosphor "copy" and "check" (regular).
+const COPY_PATH = "M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z";
+const CHECK_PATH = "M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z";
+
+function icon(d: string): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  for (const [k, v] of Object.entries({ width: "18", height: "18", viewBox: "0 0 256 256", fill: "currentColor", "aria-hidden": "true", focusable: "false" })) {
+    svg.setAttribute(k, v);
+  }
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", d);
+  svg.append(path);
+  return svg;
+}
+
+/** A fenced code block with a copy button that stays in view while the block scrolls past. */
+function codeBlock(text: string, lang: string): HTMLElement {
+  const pre = el("pre", { class: "code" }, el("code", {}, text));
+  if (lang) pre.dataset.lang = lang;
+  const copy = el("button", { type: "button", class: "copy-code", "aria-label": "Copy code" });
+  copy.append(icon(COPY_PATH));
+  copy.addEventListener("click", () => {
+    void navigator.clipboard?.writeText(text).then(() => {
+      copy.replaceChildren(icon(CHECK_PATH));
+      copy.setAttribute("aria-label", "Copied");
+      setTimeout(() => {
+        copy.replaceChildren(icon(COPY_PATH));
+        copy.setAttribute("aria-label", "Copy code");
+      }, 1500);
+    });
+  });
+  return el("div", { class: "code-block" }, copy, pre);
+}
+
 const LIST_ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
 const HEADING = /^(#{1,6})\s+(.*)$/;
 const RULE = /^\s*([-*_])(\s*\1){2,}\s*$/;
@@ -72,9 +107,7 @@ export function renderMarkdown(text: string): DocumentFragment {
       i++;
       while (i < lines.length && !FENCE.test(lines[i] ?? "")) body.push(lines[i++] ?? "");
       i++; // closing fence, or past the end while streaming
-      const pre = el("pre", { class: "code" }, el("code", {}, body.join("\n")));
-      if (lang) pre.dataset.lang = lang;
-      frag.append(pre);
+      frag.append(codeBlock(body.join("\n"), lang));
       continue;
     }
     const heading = HEADING.exec(line);

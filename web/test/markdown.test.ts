@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderMarkdown, replaceLatexSymbols } from "../src/markdown.js";
 
 describe("markdown", () => {
@@ -28,6 +28,18 @@ describe("markdown", () => {
     expect(root.querySelector("blockquote")?.textContent).toBe("quoted");
     expect(root.querySelector("pre.code code")?.textContent).toBe("echo <b>");
     expect(root.querySelector("b")).toBeNull();
+  });
+
+  it("adds a copy button that copies the raw code", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render("```\nline 1\n  line 2\n```");
+    const btn = root.querySelector<HTMLButtonElement>(".code-block > button.copy-code");
+    expect(btn?.getAttribute("aria-label")).toBe("Copy code");
+    btn?.click();
+    expect(writeText).toHaveBeenCalledWith("line 1\n  line 2");
+    await Promise.resolve();
+    expect(btn?.getAttribute("aria-label")).toBe("Copied");
   });
 
   it("replaces LaTeX symbols outside code", () => {

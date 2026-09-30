@@ -286,6 +286,14 @@ select {
 .msg.assistant hr { border: 0; border-top: 1px solid var(--line); width: 100%; }
 .msg.assistant a { color: var(--link); text-decoration: underline; }
 pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.code-block { position: relative; }
+.copy-code {
+  position: sticky; top: 6px; float: right; z-index: 1;
+  margin: 6px 6px -44px 0; width: 36px; height: 36px; padding: 0;
+  display: grid; place-items: center; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--fg); opacity: 0.85;
+}
+.copy-code:hover, .copy-code:focus-visible { opacity: 1; }
 pre.code { background: var(--code); padding: 10px 12px; border-radius: 8px; white-space: pre; overflow-x: auto; }
 
 details { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
@@ -318,6 +326,15 @@ details > :not(summary) { padding: 0 12px 10px; }
   border-top: 1px solid var(--line);
   background: var(--panel);
 }
+.composer { position: relative; }
+.composer .jump-bottom {
+  position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); z-index: 2;
+  width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+}
+.composer .jump-bottom[hidden] { display: none; }
 .composer textarea {
   flex: 1;
   min-width: 0;

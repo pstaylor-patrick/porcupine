@@ -64,6 +64,19 @@ describe("app", () => {
     return { app, conn, sent };
   }
 
+  it("shows the jump button only when scrolled up from the bottom", () => {
+    const { app } = setup({});
+    const main = document.getElementById("main") as HTMLElement;
+    Object.defineProperty(main, "scrollHeight", { value: 2000, configurable: true });
+    Object.defineProperty(main, "clientHeight", { value: 500, configurable: true });
+    main.scrollTop = 1500;
+    app.syncJump();
+    expect(document.getElementById("jump-bottom")?.hidden).toBe(true);
+    main.scrollTop = 200;
+    app.syncJump();
+    expect(document.getElementById("jump-bottom")?.hidden).toBe(false);
+  });
+
   it("names the app", () => {
     expect(appTitle()).toBe("Porcupine");
   });
