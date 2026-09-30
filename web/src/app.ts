@@ -2,7 +2,7 @@
 import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
 import { TranscriptView } from "./render.js";
 import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./transcript.js";
-import { filterModels, parseModel, sheetState, type ModelInfo, type SheetState } from "./models.js";
+import { filterModels, parseModel, rowDetail, sheetState, vendorOf, type ModelInfo, type SheetState } from "./models.js";
 import { Connection, type PiResponse, type ServerFrame, type SessionInfo } from "./ws.js";
 
 export function appTitle(): string {
@@ -548,7 +548,17 @@ export class App {
         b.setAttribute("role", "option");
         const current = this.model && this.model.id === m.id && this.model.provider === m.provider;
         b.setAttribute("aria-selected", current ? "true" : "false");
-        b.textContent = `${m.provider}/${m.id}`;
+        const name = document.createElement("span");
+        name.className = "model-option-name";
+        name.textContent = m.name ?? m.id;
+        b.append(name);
+        const detail = rowDetail(m);
+        if (detail) {
+          const d = document.createElement("span");
+          d.className = "model-option-detail";
+          d.textContent = detail;
+          b.append(d);
+        }
         b.addEventListener("click", () => void this.setModel(m));
         li.append(b);
         return li;
@@ -556,8 +566,33 @@ export class App {
     );
   }
 
+  renderModelCard(): void {
+    const card = $("model-card");
+    const m = this.model;
+    card.dataset.empty = m ? "false" : "true";
+    const name = document.createElement("p");
+    name.className = "model-card-name";
+    if (!m) {
+      name.textContent = "No model selected";
+      card.replaceChildren(name);
+      return;
+    }
+    name.textContent = m.name ?? m.id;
+    const vendor = document.createElement("p");
+    vendor.className = "model-card-vendor";
+    vendor.textContent = vendorOf(m.id, m.provider);
+    card.replaceChildren(name, vendor);
+    const detail = rowDetail(m);
+    if (detail) {
+      const d = document.createElement("p");
+      d.className = "model-card-detail";
+      d.textContent = detail;
+      card.append(d);
+    }
+  }
+
   renderHeader(): void {
-    $("model-current").textContent = this.model ? `${this.model.provider}/${this.model.id}` : "No model";
+    this.renderModelCard();
     const thinking = $("thinking-select") as HTMLSelectElement;
     const noReasoning = this.model?.reasoning === false;
     thinking.disabled = noReasoning;

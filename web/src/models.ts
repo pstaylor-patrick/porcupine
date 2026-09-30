@@ -61,3 +61,39 @@ export function sheetState(s: { attached: boolean; loading: boolean; error: stri
   if (s.error !== null) return "error";
   return s.models.length === 0 ? "empty" : "ready";
 }
+
+/** Vendor is the id prefix before "/"; ids without one fall back to the provider. */
+export function vendorOf(id: string, provider = "other"): string {
+  const i = id.indexOf("/");
+  return i > 0 ? id.slice(0, i) : provider;
+}
+
+function trim(n: number, digits: number): string {
+  return String(Number(n.toFixed(digits)));
+}
+
+/** "1M ctx" at or above a million tokens, otherwise "NK ctx"; null when unknown. */
+export function formatContext(n: number | undefined): string | null {
+  if (n === undefined || n <= 0) return null;
+  if (n >= 1_000_000) return `${trim(n / 1_000_000, 1)}M ctx`;
+  return `${trim(n / 1000, 0)}K ctx`;
+}
+
+/** "$3/$15 per M"; null when cost is missing or both values are zero. */
+export function formatPrice(cost: ModelCost | undefined): string | null {
+  if (!cost || cost.input === undefined || cost.output === undefined) return null;
+  if (cost.input === 0 && cost.output === 0) return null;
+  return `$${trim(cost.input, 2)}/$${trim(cost.output, 2)} per M`;
+}
+
+/** One secondary line: context, thinking, images, price; missing parts are left out. */
+export function rowDetail(m: ModelInfo): string {
+  const parts: string[] = [];
+  const ctx = formatContext(m.contextWindow);
+  if (ctx) parts.push(ctx);
+  if (m.reasoning) parts.push("thinking");
+  if (m.input?.includes("image")) parts.push("images");
+  const price = formatPrice(m.cost);
+  if (price) parts.push(price);
+  return parts.join(" - ");
+}

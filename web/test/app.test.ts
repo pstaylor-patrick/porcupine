@@ -82,7 +82,8 @@ describe("app", () => {
     expect(sent[0]).toEqual({ type: "get_messages" });
     expect(document.querySelectorAll(".msg.user")).toHaveLength(1);
     expect(document.getElementById("transcript")?.textContent).toContain("earlier");
-    expect(document.getElementById("model-current")?.textContent).toBe("p/m1");
+    expect(document.querySelector("#model-card .model-card-name")?.textContent).toBe("m1");
+    expect(document.querySelector("#model-card .model-card-vendor")?.textContent).toBe("p");
     expect((document.getElementById("thinking-select") as HTMLSelectElement).value).toBe("high");
   });
 
@@ -264,7 +265,7 @@ describe("app", () => {
       { type: "set_model", provider: "vercel-ai-gateway", modelId: "openai/gpt-5" },
       { type: "set_thinking_level", level: "high" },
     ]);
-    await vi.waitFor(() => expect(byId("model-current").textContent).toBe("vercel-ai-gateway/openai/gpt-5"));
+    await vi.waitFor(() => expect(document.querySelector("#model-card .model-card-name")?.textContent).toBe("openai/gpt-5"));
   });
 
   it("shows distinct model sheet states", async () => {

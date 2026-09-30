@@ -188,10 +188,16 @@ select {
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .field-hint { margin: 0; font-size: 0.85em; color: var(--muted); }
-.model-current { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.model-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.model-card p { margin: 0; overflow-wrap: anywhere; }
+.model-card-name { font-weight: 600; }
+.model-card-vendor, .model-card-detail { font-size: 0.875rem; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
+.model-card[data-empty="true"] .model-card-name { font-weight: 400; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
 .sheet input[type="search"] { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 16px; }
 .model-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; max-height: 36dvh; border: 1px solid var(--line); border-radius: 10px; }
-.model-option { width: 100%; text-align: left; background: none; border: 0; padding: 10px; overflow-wrap: anywhere; cursor: pointer; }
+.model-option { display: flex; flex-direction: column; justify-content: center; gap: 2px; width: 100%; min-height: 44px; text-align: left; background: none; border: 0; padding: 8px 10px; overflow-wrap: anywhere; cursor: pointer; }
+.model-option-name { overflow-wrap: anywhere; }
+.model-option-detail { font-size: 0.8125rem; font-weight: 400; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
 .model-option:hover, .model-option:focus-visible { background: var(--code); }
 .model-option:focus-visible { outline-offset: -2px; }
 .model-option[aria-selected="true"] { font-weight: 700; color: var(--fg); }
