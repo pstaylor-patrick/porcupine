@@ -21,7 +21,7 @@ npm run typecheck && npm run lint && npm test && npm run build
 
 ## Starting a named session
 
-One-time: `scripts/install-cli.sh` links `porcupine` into `~/.local/bin`.
+One-time (and after each pull): `ruby install.rb` checks prerequisites, builds, installs the pinned pi, links `porcupine` and `porcupine-hub` into `~/.local/bin`, and reports which secrets are set.
 
 In a tmux window, cd into the repo you want Pi to work in and run it:
 
