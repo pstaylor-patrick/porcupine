@@ -105,98 +105,128 @@ export class DialogQueue {
 
 const OTHER = "\u0000other";
 
-/** Builds the form for one dialog. `answer` is called once with pi's response shape. */
-export function renderDialog(d: Dialog, answer: (a: DialogAnswer) => void): { title: string; body: HTMLElement } {
-  const form = el("form", { class: "dialog-form" });
-  const actions = el("div", { class: "dialog-actions" });
-  const dismiss = el("button", { type: "button", class: "secondary" }, "Dismiss");
-  dismiss.addEventListener("click", () => answer({ type: "extension_ui_response", id: d.id, cancelled: true }));
+type Answer = (a: DialogAnswer) => void;
+interface Rendered {
+  title: string;
+  body: HTMLElement;
+}
 
-  if (d.kind === "confirm") {
-    if (d.message) form.append(el("p", { class: "dialog-message" }, d.message));
-    const no = el("button", { type: "button", class: "secondary" }, "No");
-    const yes = el("button", { type: "submit", class: "primary" }, "Yes");
-    no.addEventListener("click", () => answer({ type: "extension_ui_response", id: d.id, confirmed: false }));
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      answer({ type: "extension_ui_response", id: d.id, confirmed: true });
-    });
-    actions.append(no, yes);
-    form.append(actions);
-    return { title: d.title || "Confirm", body: form };
-  }
+function button(label: string, cls: string, type: "button" | "submit" = "button"): HTMLButtonElement {
+  return el("button", { type, class: cls }, label);
+}
 
-  if (d.kind === "select") {
-    const list = el("div", { class: "dialog-options" });
-    for (const o of d.options) {
-      const b = el("button", { type: "button", class: "dialog-option" }, o);
-      b.addEventListener("click", () => answer({ type: "extension_ui_response", id: d.id, value: o }));
-      list.append(b);
-    }
-    actions.append(dismiss);
-    form.append(list, actions);
-    return { title: d.title || "Choose", body: form };
-  }
-
-  if (d.kind === "input") {
-    const area = el("textarea", { class: "dialog-text", rows: "3", placeholder: d.placeholder, "aria-label": d.title || "Answer" });
-    area.value = d.prefill;
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      answer({ type: "extension_ui_response", id: d.id, value: area.value });
-    });
-    actions.append(dismiss, el("button", { type: "submit", class: "primary" }, "Submit"));
-    form.append(area, actions);
-    return { title: d.title || "Answer", body: form };
-  }
-
-  const submit = el("button", { type: "submit", class: "primary" }, "Submit");
-  const readers: (() => string)[] = [];
-  d.questions.forEach((q, qi) => {
-    const set = el("fieldset", { class: "question" });
-    const legend = el("legend", {}, q.question);
-    if (q.header) legend.prepend(el("span", { class: "chip" }, q.header));
-    set.append(legend);
-    const type = q.multiSelect ? "checkbox" : "radio";
-    const name = `q${qi}`;
-    const choice = (value: string, label: string, description: string): HTMLLabelElement => {
-      const input = el("input", { type, name, value });
-      const text = el("span", { class: "choice-text" }, el("span", { class: "choice-label" }, label));
-      if (description) text.append(el("span", { class: "choice-desc" }, description));
-      return el("label", { class: "choice" }, input, text);
-    };
-    q.options.forEach((o) => set.append(choice(o.label, o.label, o.description ?? "")));
-    const other = el("input", { type: "text", class: "other-text", placeholder: "Other", "aria-label": `Other answer to: ${q.question}` });
-    const otherChoice = choice(OTHER, "Other", "");
-    otherChoice.querySelector(".choice-label")?.replaceWith(other);
-    set.append(otherChoice);
-    // Typing an answer selects Other; choosing a listed option clears it for single-select.
-    other.addEventListener("input", () => {
-      const box = otherChoice.querySelector("input");
-      if (box) box.checked = other.value.trim() !== "";
-      sync();
-    });
-    set.addEventListener("change", sync);
-    readers.push(() => {
-      const picked = [...set.querySelectorAll<HTMLInputElement>(`input[name="${name}"]:checked`)].map((i) =>
-        i.value === OTHER ? other.value.trim() : i.value,
-      );
-      return picked.filter(Boolean).join(", ");
-    });
-    form.append(set);
-  });
-  function sync(): void {
-    submit.disabled = readers.some((r) => !r());
-  }
-  sync();
+function onSubmit(form: HTMLFormElement, fn: () => void): void {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
+    fn();
+  });
+}
+
+function dismissButton(id: string, answer: Answer): HTMLButtonElement {
+  const b = button("Dismiss", "secondary");
+  b.addEventListener("click", () => answer({ type: "extension_ui_response", id, cancelled: true }));
+  return b;
+}
+
+function renderConfirm(d: Extract<Dialog, { kind: "confirm" }>, answer: Answer): Rendered {
+  const form = el("form", { class: "dialog-form" });
+  if (d.message) form.append(el("p", { class: "dialog-message" }, d.message));
+  const no = button("No", "secondary");
+  no.addEventListener("click", () => answer({ type: "extension_ui_response", id: d.id, confirmed: false }));
+  onSubmit(form, () => answer({ type: "extension_ui_response", id: d.id, confirmed: true }));
+  form.append(el("div", { class: "dialog-actions" }, no, button("Yes", "primary", "submit")));
+  return { title: d.title || "Confirm", body: form };
+}
+
+function renderSelect(d: Extract<Dialog, { kind: "select" }>, answer: Answer): Rendered {
+  const list = el("div", { class: "dialog-options" });
+  for (const o of d.options) {
+    const b = button(o, "dialog-option");
+    b.addEventListener("click", () => answer({ type: "extension_ui_response", id: d.id, value: o }));
+    list.append(b);
+  }
+  const form = el("form", { class: "dialog-form" }, list, el("div", { class: "dialog-actions" }, dismissButton(d.id, answer)));
+  return { title: d.title || "Choose", body: form };
+}
+
+function renderInput(d: Extract<Dialog, { kind: "input" }>, answer: Answer): Rendered {
+  const area = el("textarea", { class: "dialog-text", rows: "3", placeholder: d.placeholder, "aria-label": d.title || "Answer" });
+  area.value = d.prefill;
+  const form = el("form", { class: "dialog-form" }, area);
+  onSubmit(form, () => answer({ type: "extension_ui_response", id: d.id, value: area.value }));
+  form.append(el("div", { class: "dialog-actions" }, dismissButton(d.id, answer), button("Submit", "primary", "submit")));
+  return { title: d.title || "Answer", body: form };
+}
+
+/** One question's fieldset, plus a reader returning its answer ("" while unanswered). */
+function questionField(q: AskQuestion, name: string, changed: () => void): { set: HTMLFieldSetElement; read: () => string } {
+  const set = el("fieldset", { class: "question" });
+  const legend = el("legend", {}, q.question);
+  if (q.header) legend.prepend(el("span", { class: "chip" }, q.header));
+  set.append(legend);
+  const type = q.multiSelect ? "checkbox" : "radio";
+  const choice = (value: string, label: Node): HTMLLabelElement => {
+    const text = el("span", { class: "choice-text" }, label);
+    return el("label", { class: "choice" }, el("input", { type, name, value }), text);
+  };
+  for (const o of q.options) {
+    const c = choice(o.label, el("span", { class: "choice-label" }, o.label));
+    if (o.description) c.lastElementChild?.append(el("span", { class: "choice-desc" }, o.description));
+    set.append(c);
+  }
+  const other = el("input", { type: "text", class: "other-text", placeholder: "Other", "aria-label": `Other answer to: ${q.question}` });
+  const otherChoice = choice(OTHER, other);
+  set.append(otherChoice);
+  // Typing an answer selects Other.
+  other.addEventListener("input", () => {
+    const box = otherChoice.querySelector("input");
+    if (box) box.checked = other.value.trim() !== "";
+    changed();
+  });
+  set.addEventListener("change", changed);
+  const read = (): string =>
+    [...set.querySelectorAll<HTMLInputElement>(`input[name="${name}"]:checked`)]
+      .map((i) => (i.value === OTHER ? other.value.trim() : i.value))
+      .filter(Boolean)
+      .join(", ");
+  return { set, read };
+}
+
+function renderAsk(d: Extract<Dialog, { kind: "ask" }>, answer: Answer): Rendered {
+  const form = el("form", { class: "dialog-form" });
+  const submit = button("Submit", "primary", "submit");
+  const sync = (): void => {
+    submit.disabled = fields.some((f) => !f.read());
+  };
+  const fields = d.questions.map((q, i) => questionField(q, `q${i}`, sync));
+  form.append(...fields.map((f) => f.set));
+  sync();
+  onSubmit(form, () => {
     if (submit.disabled) return;
     const answers: Record<string, string> = {};
-    d.questions.forEach((q, i) => (answers[q.question] = readers[i]?.() ?? ""));
+    d.questions.forEach((q, i) => (answers[q.question] = fields[i]?.read() ?? ""));
     answer({ type: "extension_ui_response", id: d.id, value: JSON.stringify({ answers }) });
   });
-  actions.append(dismiss, submit);
-  form.append(actions);
+  form.append(el("div", { class: "dialog-actions" }, dismissButton(d.id, answer), submit));
   return { title: d.questions.length > 1 ? "Questions" : "Question", body: form };
+}
+
+/** Builds the form for one dialog. `answer` fires at most once, so a double tap sends one reply. */
+export function renderDialog(d: Dialog, answer: Answer): Rendered {
+  let sent = false;
+  const once: Answer = (a) => {
+    if (sent) return;
+    sent = true;
+    answer(a);
+  };
+  switch (d.kind) {
+    case "confirm":
+      return renderConfirm(d, once);
+    case "select":
+      return renderSelect(d, once);
+    case "input":
+      return renderInput(d, once);
+    case "ask":
+      return renderAsk(d, once);
+  }
 }
