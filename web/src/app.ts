@@ -712,6 +712,23 @@ export class App {
   }
 }
 
+/**
+ * iOS Safari ignores interactive-widget=resizes-content: the keyboard overlays
+ * the layout and pans the page, pushing the header off screen. Size the layout
+ * to the visual viewport and undo the pan so the header and composer stay put.
+ */
+function pinToVisualViewport(): void {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const sync = (): void => {
+    document.documentElement.style.setProperty("--app-height", `${vv.height}px`);
+    if (window.scrollY !== 0) window.scrollTo(0, 0);
+  };
+  vv.addEventListener("resize", sync);
+  vv.addEventListener("scroll", sync);
+  sync();
+}
+
 async function checkAuth(): Promise<void> {
   try {
     const r = await fetch("/api/me", { credentials: "same-origin" });
@@ -742,6 +759,7 @@ export function start(): void {
   );
   app = new App(conn);
   app.bind();
+  pinToVisualViewport();
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") conn.kick();
   });
