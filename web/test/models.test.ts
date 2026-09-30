@@ -3,6 +3,7 @@ import {
   CAPABILITIES,
   CHEAP_INPUT_MAX,
   duplicateIds,
+  providersOf,
   filterModels,
   migrateRecent,
   providerLabel,
@@ -299,5 +300,17 @@ describe("providers", () => {
     const s = memStorage();
     s.data.set(RECENT_KEY, JSON.stringify(["anthropic/claude-opus-5.5", "zai/glm-5"]));
     expect(pushRecent(s, `${OR}|zai/glm-5`, models, OR)).toEqual([`${OR}|zai/glm-5`, `${OR}|anthropic/claude-opus-5.5`]);
+  });
+});
+
+describe("providersOf", () => {
+  it("lists distinct providers in first-seen order", () => {
+    const ms = [
+      { provider: "openrouter", id: "a/x" },
+      { provider: "vercel-ai-gateway", id: "a/x" },
+      { provider: "openrouter", id: "b/y" },
+    ];
+    expect(providersOf(ms)).toEqual(["openrouter", "vercel-ai-gateway"]);
+    expect(providersOf([])).toEqual([]);
   });
 });
