@@ -1,10 +1,10 @@
 locals {
-  fqdn           = "porcupine.example.com"
+  fqdn           = var.fqdn
   acme_challenge = "_acme-challenge.${local.fqdn}"
 }
 
 data "aws_route53_zone" "root" {
-  name         = "example.com"
+  name         = var.zone_name
   private_zone = false
 }
 
@@ -13,7 +13,7 @@ resource "aws_route53_record" "porcupine" {
   name    = local.fqdn
   type    = "A"
   ttl     = 300
-  records = [var.tailnet_ipv4]
+  records = [var.host_ipv4]
 }
 
 # Caddy uses this user for Let's Encrypt DNS-01. Its access key is created
@@ -62,7 +62,7 @@ data "aws_iam_policy_document" "caddy_dns01" {
 }
 
 resource "aws_iam_user_policy" "caddy_dns01" {
-  name   = "route53-dns01-example-com"
+  name   = "route53-dns01-${replace(var.zone_name, ".", "-")}"
   user   = aws_iam_user.caddy_dns01.name
   policy = data.aws_iam_policy_document.caddy_dns01.json
 }

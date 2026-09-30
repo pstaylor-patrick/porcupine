@@ -14,8 +14,8 @@ require "open3"
 
 ROOT = __dir__
 BIN_DIR = File.join(Dir.home, ".local", "bin")
-ENV_FILE = ENV.fetch("PORCUPINE_ENV_FILE", File.join(Dir.home, ".config/porcupine/.env"))
-REQUIRED_SECRETS = %w[PORCUPINE_RPC_PASSWORD PORCUPINE_COOKIE_SECRET VERCEL_AI_GATEWAY_API_KEY].freeze
+ENV_FILE = ENV.fetch("PORCUPINE_ENV_FILE") { File.join(ENV.fetch("XDG_CONFIG_HOME", File.join(Dir.home, ".config")), "porcupine", ".env") }
+REQUIRED_KEYS = %w[PORCUPINE_ORIGIN PORCUPINE_RPC_PASSWORD PORCUPINE_COOKIE_SECRET].freeze
 LINKS = {
   "porcupine" => "hub/dist/cli/main.js",
   "porcupine-hub" => "hub/dist/server/main.js"
@@ -65,16 +65,25 @@ end
 def check_secrets
   step "checking secrets in #{ENV_FILE}"
   unless File.exist?(ENV_FILE)
-    warn_line "missing; create it with #{REQUIRED_SECRETS.join(', ')}"
+    warn_line "missing; copy .env.example there and fill in #{REQUIRED_KEYS.join(', ')}"
     return
   end
   keys = File.readlines(ENV_FILE).filter_map { |l| l[/\A\s*([A-Z0-9_]+)=\S/, 1] }
-  REQUIRED_SECRETS.each do |k|
+  REQUIRED_KEYS.each do |k|
     keys.include?(k) ? puts("    #{k}: set") : warn_line("#{k} is not set")
   end
 end
 
+def enable_hooks
+  return unless File.directory?(File.join(ROOT, ".git"))
+
+  step "enabling git hooks (scripts/hooks)"
+  run! "git", "config", "core.hooksPath", "scripts/hooks"
+  warn_line "gitleaks not found; the pre-commit hook will use Docker or skip" unless system("command -v gitleaks >/dev/null")
+end
+
 check_prereqs
+enable_hooks
 build
 install_pi unless ARGV.include?("--no-pi")
 link_clis
@@ -83,6 +92,6 @@ check_secrets
 puts <<~NEXT
 
   Done. Start the hub (once) and a named session:
-    tmux new-session -d -s porcupine-hub 'PORCUPINE_HUB_ADDR=172.17.0.1:8787 porcupine-hub'
-    tmux new-session -s myrepo -c ~/code/org/myrepo 'porcupine --name myrepo'
+    tmux new-session -d -s porcupine-hub porcupine-hub
+    tmux new-session -s myrepo -c ~/code/myrepo 'porcupine --name myrepo'
 NEXT

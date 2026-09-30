@@ -1,6 +1,11 @@
 node_modules/
 dist/
 .env*
+!.env.example
 *.tfstate*
 .terraform/
 tfplan
+infra/backend.hcl
+infra/terraform.tfvars
+*.pem
+*.key

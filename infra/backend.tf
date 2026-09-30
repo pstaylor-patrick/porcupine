@@ -1,8 +1,8 @@
+# Partial backend config: the bucket (and optionally region) come from a local,
+# untracked backend.hcl. See backend.hcl.example.
 terraform {
   backend "s3" {
-    bucket       = "my-terraform-state"
     key          = "porcupine/infra.tfstate"
-    region       = "us-east-1"
     encrypt      = true
     use_lockfile = true
   }

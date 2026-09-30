@@ -1,85 +1,114 @@
 # Porcupine
 
-A mobile-first, password-protected PWA at https://porcupine.example.com for driving
-Pi RPC sessions started by hand in tmux on the VM. It is served from the VM and
-reachable only over the tailnet.
+A small, mobile-first PWA for driving [pi](https://github.com/earendil-works/pi)
+coding-agent sessions from your phone or laptop. You start sessions in tmux on
+a machine you own; porcupine lets you watch them stream, send prompts, switch
+models, answer the agent's questions and stop runs from a browser.
 
-## Prerequisites
+```
+phone / laptop ──HTTPS──> reverse proxy ──> porcupine-hub ──unix socket──> porcupine (in tmux) ──stdio──> pi --mode rpc
+```
 
-- Node 22 LTS (per-user install, not system packages)
-- pi 0.99.1 under `~/.local` (`scripts/install-pi.sh`)
-- Docker (for Terraform). TLS is served by the shared Caddy edge in the proxy's config (site file sites/porcupine.caddy, route53 DNS-01); the hub must listen on the docker0 gateway: PORCUPINE_HUB_ADDR=172.17.0.1:8787
-- The VM, laptop and phone on the same tailnet
-- Secrets in `~/.config/porcupine/.env` (never committed)
+- `porcupine` wraps `pi --mode rpc` in a tmux pane and exposes it on a local Unix socket.
+- `porcupine-hub` serves the PWA, checks the password and relays each browser to a session.
+- Everything stays on your host and private network. There is no cloud component.
+
+See [SECURITY.md](SECURITY.md) before exposing it anywhere: a logged-in user can
+run shell commands on the host through the agent.
+
+## Requirements
+
+- Linux or macOS host with Node 22+, tmux and Ruby (for the installer)
+- A private network between the host and your devices (Tailscale, WireGuard or a LAN)
+- HTTPS in front of the hub. Service workers and `Secure` cookies need it;
+  [examples/Caddyfile](examples/Caddyfile) shows one way.
+- A model provider key pi can use. The default model is
+  `vercel-ai-gateway` / `anthropic/claude-opus-5.5` with low thinking.
+
+## Install
+
+```sh
+git clone https://github.com/pstaylor-patrick/porcupine.git
+cd porcupine
+mkdir -p ~/.config/porcupine && cp .env.example ~/.config/porcupine/.env && chmod 600 ~/.config/porcupine/.env
+$EDITOR ~/.config/porcupine/.env   # PORCUPINE_ORIGIN, password, cookie secret, provider key
+ruby install.rb
+```
+
+`install.rb` checks prerequisites, builds, installs the pinned pi under
+`~/.local`, links `porcupine` and `porcupine-hub` into `~/.local/bin`, enables
+the repo's pre-commit hook and reports which settings are missing. Rerun it
+after each pull. `--no-pi` skips the pi install.
+
+## Configuration
+
+Settings come from the process environment or the env file
+(`PORCUPINE_ENV_FILE`, default `~/.config/porcupine/.env`).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORCUPINE_ORIGIN` | required | URL you open the app at; other WebSocket origins are refused |
+| `PORCUPINE_RPC_PASSWORD` | required | Login password |
+| `PORCUPINE_COOKIE_SECRET` | required | Cookie signing key, `openssl rand -hex 32` |
+| `PORCUPINE_HUB_ADDR` | `127.0.0.1:8787` | Hub listen address; use a Docker bridge IP if the proxy runs in Docker |
+| `VERCEL_AI_GATEWAY_API_KEY` | | Passed to pi as `AI_GATEWAY_API_KEY` |
+| `PORCUPINE_RUNTIME_DIR` | `$XDG_RUNTIME_DIR/porcupine` | Session sockets |
+
+## Run
+
+Start the hub once, in its own tmux session:
+
+```sh
+tmux new-session -d -s porcupine-hub porcupine-hub
+```
+
+Then start a named session in any repo you want pi to work in:
+
+```sh
+tmux new-session -s myrepo -c ~/code/myrepo 'porcupine --name myrepo'
+```
+
+It appears in the app's sidebar. Without `--name` the name is the tmux
+`session:window`, else the folder name. Arguments after `--` go to pi, e.g.
+`porcupine --name x -- --model anthropic/claude-sonnet-5.5 --thinking high`.
+Ctrl-C in the pane ends the session; a reboot clears them all.
+
+## Optional: DNS and TLS on AWS
+
+`infra/` is a Terraform example for a public hostname that points at a private
+IP, with an IAM user scoped to the DNS-01 TXT record Caddy needs for Let's
+Encrypt. Copy `infra/backend.hcl.example` and `infra/terraform.tfvars.example`
+to their untracked names, then:
+
+```sh
+scripts/tf.sh init && scripts/tf.sh plan -out=tfplan && scripts/tf.sh apply tfplan
+scripts/caddy-keys.sh   # writes the IAM access key to ~/.config/porcupine/caddy.env
+```
 
 ## Development
 
 ```sh
 npm ci
 npm run typecheck && npm run lint && npm test && npm run build
+scripts/dev.sh          # hub on localhost in dev mode
+scripts/smoke.sh        # end-to-end against a running hub and real pi
 ```
 
-## Starting a named session
+### Keeping your details out of commits
 
-One-time (and after each pull): `ruby install.rb` checks prerequisites, builds, installs the pinned pi, links `porcupine` and `porcupine-hub` into `~/.local/bin`, and reports which secrets are set.
+The pre-commit hook runs [gitleaks](https://github.com/gitleaks/gitleaks) on
+staged changes (the binary, or Docker if it is not installed). To also block
+strings specific to your deployment, such as your domain or network addresses,
+list them one per line in `~/.config/porcupine/denylist`. That file stays on
+your machine.
 
-In a tmux window, cd into the repo you want Pi to work in and run it:
+## Logs
 
-```bash
-tmux new-session -s myrepo -c ~/code/org/myrepo   # or a new window in an existing session
-porcupine --name myrepo                            # name shown in the app's sidebar
-```
+- Hub: `tmux attach -t porcupine-hub` (logins, relay errors).
+- Sessions: each `porcupine` pane (registration, runs, pi stderr).
 
-Detach (Ctrl-b d) and close SSH; the session keeps running and appears in the
-app. Without `--name`, the name is the tmux `session:window`, else the folder
-name. Extra args after `--` go to pi, e.g. `porcupine --name x -- --model anthropic/claude-opus-5.5`.
-Ctrl-C in the pane ends the session. A VM restart clears all sessions.
+## Rotating secrets
 
-## Runbook
-
-### Start order
-
-1. Hub, in the tmux session `porcupine-hub`:
-   ```sh
-   tmux new-session -d -s porcupine-hub
-   tmux send-keys -t porcupine-hub 'cd ~/code/pstaylor-patrick/porcupine && npm run build && PORCUPINE_HUB_ADDR=172.17.0.1:8787 node hub/dist/server/main.js' Enter
-   ```
-   After a rebuild, restart it in the same session (Ctrl-C, then rerun the command).
-2. TLS: the shared Caddy edge in `the proxy's config` already proxies porcupine.example.com
-   (sites/porcupine.caddy) to 172.17.0.1:8787. Porcupine does not start or edit it.
-3. Sessions: in each repo's tmux pane run `porcupine [--name x] [pi args]`
-   (or `node ~/code/pstaylor-patrick/porcupine/hub/dist/cli/main.js`). The pane prints logs only.
-
-### Smoke test
-
-```sh
-npm run build && scripts/smoke.sh
-```
-
-It starts `porcupine --name smoke` in a temporary tmux session, logs in through
-https://porcupine.example.com, lists and attaches, runs get_state,
-get_available_models, set_thinking_level, a real prompt to agent_settled (the reply
-must not be an error), new_session, a reattach with `since`, then SIGKILLs the CLI
-and checks the hub prunes its socket. Any failed assertion exits non-zero.
-
-### Logs
-
-- Hub: `tmux attach -t porcupine-hub` (login failures and relay errors are logged there).
-- Sessions: the tmux pane running `porcupine` (registered, hub connected, run started and settled, `pi:` stderr).
-- TLS and certificates: the shared Caddy edge's logs in `the proxy's config`.
-- Runtime files: `$XDG_RUNTIME_DIR/porcupine` (or `~/.porcupine/run`), one `.sock` and `.json` per session.
-
-### Rotating secrets
-
-- Cookie secret: replace `PORCUPINE_COOKIE_SECRET` in the secrets `.env` with the output of
-  `openssl rand -hex 32` and restart the hub. Every browser is logged out.
-- Password: change `PORCUPINE_RPC_PASSWORD` and restart the hub.
-- IAM DNS-01 key (only if the IAM user is still used): run `scripts/caddy-keys.sh`, update the
-  consumer, then delete the old key with `aws iam delete-access-key --profile personal`.
-
-### After a VM restart
-
-- Pi sessions are gone; their stale `.sock`/`.json` files are pruned by the hub on start.
-- The shared Caddy edge comes back through Docker's restart policy.
-- The hub does not restart itself: recreate the `porcupine-hub` tmux session (step 1),
-  then start `porcupine` in each repo pane again.
+- Cookie secret: replace `PORCUPINE_COOKIE_SECRET`, restart the hub. Every browser is logged out.
+- Password: change `PORCUPINE_RPC_PASSWORD`, restart the hub.
+- DNS-01 key: `scripts/caddy-keys.sh`, restart the proxy, then delete the old key with `aws iam delete-access-key`.

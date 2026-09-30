@@ -8,11 +8,12 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(fileURLToPath(new URL("../hub/package.json", import.meta.url)));
 const WebSocket = require("ws");
 
-const BASE = process.env.SMOKE_BASE_URL ?? "https://porcupine.example.com";
+const BASE = process.env.SMOKE_BASE_URL;
+if (!BASE) throw new Error("SMOKE_BASE_URL is required (scripts/smoke.sh sets it from PORCUPINE_ORIGIN)");
 const PASSWORD = process.env.SMOKE_PASSWORD;
 const NAME = process.env.SMOKE_SESSION_NAME ?? "smoke";
 const RUN_TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS ?? 180_000);
-const EXPECTED_MODEL = { provider: "vercel-ai-gateway", id: "anthropic/claude-sonnet-5.5" };
+const EXPECTED_MODEL = { provider: "vercel-ai-gateway", id: "anthropic/claude-opus-5.5" };
 
 function log(msg) {
   console.log(`smoke: ${msg}`);

@@ -28,6 +28,12 @@ export function resolveRuntimeDir(input: RuntimeDirInput): string {
   return join(input.home ?? homedir(), ".porcupine", "run");
 }
 
+/** The env file holding secrets and site config: PORCUPINE_ENV_FILE, else $XDG_CONFIG_HOME/porcupine/.env, else ~/.config/porcupine/.env. */
+export function defaultEnvFile(env: NodeJS.ProcessEnv, home: string = homedir()): string {
+  if (env.PORCUPINE_ENV_FILE) return env.PORCUPINE_ENV_FILE;
+  return join(env.XDG_CONFIG_HOME || join(home, ".config"), "porcupine", ".env");
+}
+
 /** Creates the runtime dir with mode 0700 and returns it. */
 export function ensureRuntimeDir(dir: string): string {
   mkdirSync(dir, { recursive: true, mode: 0o700 });

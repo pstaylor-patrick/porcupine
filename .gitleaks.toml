@@ -1,0 +1,19 @@
+# gitleaks config: the default rules plus porcupine's own settings.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "porcupine-env-secret"
+description = "Porcupine password or cookie secret with a value"
+regex = '''(?i)PORCUPINE_(RPC_PASSWORD|COOKIE_SECRET)\s*=\s*['"]?[A-Za-z0-9_+/=-]{8,}(\s|$|['"])'''
+keywords = ["porcupine_rpc_password", "porcupine_cookie_secret"]
+
+[[rules]]
+id = "ai-gateway-key"
+description = "AI gateway API key with a value"
+regex = '''(?i)AI_GATEWAY_API_KEY\s*=\s*['"]?[A-Za-z0-9_+/=-]{8,}(\s|$|['"])'''
+keywords = ["ai_gateway_api_key"]
+
+[allowlist]
+description = "Examples and lockfiles"
+paths = ['''\.env\.example$''', '''\.example$''', '''package-lock\.json$''']

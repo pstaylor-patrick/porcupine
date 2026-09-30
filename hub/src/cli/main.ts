@@ -1,16 +1,13 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveRuntimeDir } from "../shared/paths.js";
+import { defaultEnvFile, resolveRuntimeDir } from "../shared/paths.js";
 import { buildChildEnv, buildPiArgs, parseCliArgs, parseEnvFile, resolveName } from "./args.js";
 import { limitsFromEnv } from "./event-log.js";
 import { createLogger } from "./log.js";
 import { readPinnedPiVersion, startSession } from "./session.js";
 
 const ASK_EXTENSION = fileURLToPath(new URL("../extension/ask-user-question.js", import.meta.url));
-const DEFAULT_ENV_FILE = join(homedir(), "1-areas", "pst", "porcupine", "secrets", ".env");
 
 function loadEnvFile(path: string): Record<string, string> {
   try {
@@ -33,7 +30,7 @@ async function main(): Promise<void> {
     process.exit(2);
   }
   const cwd = process.cwd();
-  const envFile = process.env.PORCUPINE_ENV_FILE ?? DEFAULT_ENV_FILE;
+  const envFile = defaultEnvFile(process.env);
   const session = await startSession({
     name: resolveName({ explicit: args.name, env: process.env, cwd }),
     cwd,

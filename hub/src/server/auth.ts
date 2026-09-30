@@ -68,7 +68,7 @@ export function clearedCookie(secure: boolean): string {
 
 /**
  * Peers allowed to set X-Forwarded-For: loopback, and Docker bridge addresses
- * (172.16.0.0/12), where the shared shared Caddy container connects from.
+ * (172.16.0.0/12), where a reverse proxy running in Docker connects from.
  */
 export function isTrustedProxy(peer: string): boolean {
   const v4 = peer.startsWith("::ffff:") ? peer.slice(7) : peer;
