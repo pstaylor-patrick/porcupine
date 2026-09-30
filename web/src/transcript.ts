@@ -153,7 +153,7 @@ function byMsgKey(t: Transcript, key: string | null): Item | undefined {
 function finishAssistant(t: Transcript, item: Item & { kind: "assistant" }, m: Rec): void {
   item.blocks = assistantBlocks(t, item.key, m.content);
   item.msgKey = messageKey(m);
-  item.error = m.stopReason === "error" ? str(m.errorMessage) || "model error" : null;
+  item.error = m.stopReason === "error" ? errorSummary(str(m.errorMessage)) || "model error" : null;
   if (m.stopReason === "aborted") item.error = "aborted";
   touch(item);
 }
@@ -227,6 +227,26 @@ function applyUpdate(t: Transcript, ev: Rec): void {
     item.blocks[idx] = { type: "toolCall", id };
   } else return;
   touch(item);
+}
+
+/**
+ * Provider errors arrive as "429 {json...}" with routing metadata; show the
+ * status and the human message only. The full text stays in the pi pane.
+ */
+export function errorSummary(raw: string): string {
+  const text = raw.trim();
+  const brace = text.indexOf("{");
+  if (brace >= 0) {
+    try {
+      const data: unknown = JSON.parse(text.slice(brace));
+      const err = isRec(data) && isRec(data.error) ? data.error : data;
+      const msg = isRec(err) ? str(err.message) : "";
+      if (msg) return `${text.slice(0, brace).trim()}${brace > 0 ? ": " : ""}${msg}`;
+    } catch {
+      // not JSON: fall through to the length cap
+    }
+  }
+  return text.length > 300 ? `${text.slice(0, 300)}...` : text;
 }
 
 /** Applies one pi event (or porcupine synthetic event) to the transcript in place. */
@@ -311,10 +331,10 @@ export function applyEvent(t: Transcript, ev: Rec): void {
       push(t, { kind: "notice", level: "error", text: `extension error (${str(ev.event)}): ${str(ev.error)}` });
       return;
     case "auto_retry_start":
-      push(t, { kind: "status", text: `retrying (${String(ev.attempt)}/${String(ev.maxAttempts)}): ${str(ev.errorMessage)}` });
+      push(t, { kind: "status", text: `retrying (${String(ev.attempt)}/${String(ev.maxAttempts)}): ${errorSummary(str(ev.errorMessage))}` });
       return;
     case "auto_retry_end":
-      if (ev.success !== true) push(t, { kind: "notice", level: "error", text: `retry failed: ${str(ev.finalError)}` });
+      if (ev.success !== true) push(t, { kind: "notice", level: "error", text: `retry failed: ${errorSummary(str(ev.finalError))}` });
       return;
     case "compaction_start":
       push(t, { kind: "status", text: `compacting context (${str(ev.reason)})` });
@@ -322,7 +342,7 @@ export function applyEvent(t: Transcript, ev: Rec): void {
     case "compaction_end":
       push(t, {
         kind: "status",
-        text: ev.aborted === true ? "compaction aborted" : ev.errorMessage ? `compaction failed: ${str(ev.errorMessage)}` : "compaction done",
+        text: ev.aborted === true ? "compaction aborted" : ev.errorMessage ? `compaction failed: ${errorSummary(str(ev.errorMessage))}` : "compaction done",
       });
       return;
     default:

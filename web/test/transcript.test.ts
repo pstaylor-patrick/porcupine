@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { applyEvent, emptyTranscript, fromMessages } from "../src/transcript.js";
+import { applyEvent, emptyTranscript, errorSummary, fromMessages } from "../src/transcript.js";
 
 const user = { role: "user", content: "hi", timestamp: 1 };
 const assistantFinal = {
@@ -106,5 +106,16 @@ describe("event reducer", () => {
     // A new live message after the replay still appends.
     applyEvent(t, { type: "message_start", message: { role: "user", content: "next", timestamp: 10 } });
     expect(t.items).toHaveLength(3);
+  });
+});
+
+describe("errorSummary", () => {
+  it("reduces a gateway error to its status and message", () => {
+    const raw = '429 {"error":{"message":"No access to this model at this time.","type":"rate_limit_exceeded"},"providerMetadata":{"gateway":{}}}';
+    expect(errorSummary(raw)).toBe("429: No access to this model at this time.");
+  });
+
+  it("caps long unstructured errors", () => {
+    expect(errorSummary("x".repeat(400))).toBe(`${"x".repeat(300)}...`);
   });
 });

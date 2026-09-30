@@ -124,9 +124,6 @@ export class App {
       onStatus: (s: "connecting" | "open" | "closed") => {
         this.connState = s;
         const label = s === "open" ? "Connected" : s === "connecting" ? "Connecting" : "Disconnected";
-        const dot = $("conn-dot");
-        dot.dataset.state = s;
-        dot.setAttribute("aria-label", label);
         $("settings-conn").textContent = label;
       },
     };

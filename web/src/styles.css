@@ -135,9 +135,6 @@ select {
   font-size: 20px; line-height: 1;
   cursor: pointer;
 }
-.conn-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--fg); background: transparent; }
-.conn-dot[data-state="open"] { background: var(--fg); }
-.conn-dot[data-state="connecting"] { border-color: var(--crayon); background: var(--crayon); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* Scrim shared by the sidebar flyout and the session sheet. */
@@ -294,7 +291,7 @@ details > :not(summary) { padding: 0 12px 10px; }
 .notice { padding: 8px 12px; border-radius: 8px; border-left: 3px solid var(--muted); background: var(--panel); white-space: pre-wrap; overflow-wrap: anywhere; }
 .notice-warn { border-color: var(--crayon); }
 .notice-error { border-color: var(--fg); color: var(--fg); font-weight: 600; }
-.status-line { color: var(--muted); font-size: 0.85em; text-align: center; }
+.status-line { color: var(--muted); font-size: 0.85em; text-align: center; overflow-wrap: anywhere; }
 .link { background: none; border: 0; color: var(--link); text-decoration: underline; padding: 4px 0; cursor: pointer; }
 
 .composer {
@@ -320,6 +317,7 @@ details > :not(summary) { padding: 0 12px 10px; }
 .composer button { flex: none; min-height: 40px; padding: 0 16px; border-radius: 20px; border: 0; font-weight: 600; }
 .primary { background: var(--accent); color: var(--accent-fg); }
 .danger { background: var(--fg); color: var(--bg); }
+.composer .icon-send { width: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
 [hidden] { display: none !important; }
 
 @media (min-width: 900px) {
@@ -402,12 +400,9 @@ details > :not(summary) { padding: 0 12px 10px; }
 .main:has(> .empty[hidden]) > .transcript:empty { min-height: 100%; }
 .crayon { pointer-events: none; fill: none; stroke: var(--crayon); stroke-linecap: round; stroke-linejoin: round; }
 .crayon-scribble { display: none; position: absolute; inset: 0; width: 100%; height: 100%; stroke-width: 3; }
-.crayon-stream { flex: none; width: 48px; height: 12px; stroke-width: 2.5; }
-@media (max-width: 360px) { .crayon-stream { display: none; } }
-@media (prefers-reduced-motion: no-preference) {
+@media (max-width: 360px) { @media (prefers-reduced-motion: no-preference) {
   .empty.scribble:has(> .crayon-scribble) { background-image: var(--scene-moon), var(--scene-horizon); }
   .crayon-scribble { display: block; }
   .crayon-scribble path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: crayon-draw 1.4s ease-out forwards; }
-  body.is-streaming .crayon-stream path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: crayon-draw 1.8s ease-in-out infinite alternate; }
 }
 @keyframes crayon-draw { to { stroke-dashoffset: 0; } }
