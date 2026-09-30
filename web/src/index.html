@@ -2,9 +2,63 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>Porcupine</title>
-    <script type="module" src="app.js"></script>
+    <meta name="theme-color" content="#1f2a24" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Porcupine" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.js"></script>
   </head>
-  <body></body>
+  <body>
+    <div id="app" class="layout">
+      <nav id="sidebar" class="sidebar" aria-label="Sessions">
+        <h2 class="sidebar-title">Sessions</h2>
+        <ul id="session-list" class="session-list"></ul>
+      </nav>
+      <header class="topbar">
+        <label class="visually-hidden" for="session-select">Session</label>
+        <select id="session-select" class="session-select"></select>
+        <button id="model-button" type="button" class="chip" aria-haspopup="dialog" aria-label="Choose model">model</button>
+        <label class="visually-hidden" for="thinking-select">Thinking level</label>
+        <select id="thinking-select" class="chip" aria-label="Thinking level">
+          <option value="off">think: off</option>
+          <option value="minimal">think: minimal</option>
+          <option value="low">think: low</option>
+          <option value="medium">think: medium</option>
+          <option value="high">think: high</option>
+          <option value="xhigh">think: xhigh</option>
+          <option value="max">think: max</option>
+        </select>
+        <button id="new-session" type="button" class="icon-button" aria-label="New session">+</button>
+        <span id="conn-dot" class="conn-dot" role="img" aria-label="Disconnected"></span>
+      </header>
+      <main id="main" class="main">
+        <div id="transcript" class="transcript" aria-label="Transcript"></div>
+        <p id="empty" class="empty">No session attached. Start one in a tmux pane with <code>porcupine</code>.</p>
+      </main>
+      <form id="composer" class="composer" autocomplete="off">
+        <div id="attachments" class="attachments" hidden></div>
+        <label class="visually-hidden" for="input">Message</label>
+        <textarea id="input" rows="1" placeholder="Message pi" enterkeyhint="send"></textarea>
+        <label id="steer-wrap" class="steer" hidden><input id="steer" type="checkbox" /> steer</label>
+        <button id="send" type="submit" class="primary" aria-label="Send">Send</button>
+        <button id="abort" type="button" class="danger" aria-label="Stop" hidden>Stop</button>
+      </form>
+      <div id="run-status" class="visually-hidden" role="status" aria-live="polite"></div>
+    </div>
+    <dialog id="model-dialog" class="model-dialog" aria-label="Choose model">
+      <form method="dialog" class="model-form">
+        <label class="visually-hidden" for="model-filter">Filter models</label>
+        <input id="model-filter" type="search" placeholder="Filter models" autocomplete="off" />
+        <ul id="model-list" class="model-list" role="listbox" aria-label="Models"></ul>
+        <button type="submit" class="link" value="cancel">Close</button>
+      </form>
+    </dialog>
+  </body>
 </html>
