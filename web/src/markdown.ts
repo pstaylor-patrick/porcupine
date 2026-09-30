@@ -16,7 +16,7 @@ const LATEX_SYMBOLS: Record<string, string> = {
 const LATEX_RE = new RegExp(`\\$?\\\\(${Object.keys(LATEX_SYMBOLS).join("|")})(?![A-Za-z])\\$?`, "g");
 
 export function replaceLatexSymbols(text: string): string {
-  return text.replace(LATEX_RE, (_m, name: string) => LATEX_SYMBOLS[name] ?? _m);
+  return text.replace(LATEX_RE, (match, name: string) => LATEX_SYMBOLS[name] ?? match);
 }
 
 const SAFE_URL = /^(https?:|mailto:)/i;
