@@ -122,7 +122,9 @@ select {
 .sidebar[data-open="true"] { transform: none; visibility: visible; transition: transform 200ms ease; }
 .sidebar-head { display: flex; align-items: center; min-height: 40px; }
 .sidebar-title { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 8px; }
-.session-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+/* Scroll containers clip the 2px-offset focus ring; 4px padding with a matching
+   negative margin gives it room without shifting layout. */
+.session-list { list-style: none; margin: 4px -4px 0; padding: 4px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 .session-empty { color: var(--muted); font-size: 0.9em; margin: 8px; flex: 1 1 auto; }
 .session-item { width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 10px 8px; display: flex; flex-direction: column; min-height: 44px; cursor: pointer; }
 .session-item:hover { background: var(--code); }
@@ -154,7 +156,7 @@ select {
 .sheet[data-open="true"] { transform: none; visibility: visible; transition: transform 220ms ease; }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; }
 .sheet-title { margin: 0; font-size: 1.05rem; }
-.sheet-body { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 16px; padding-bottom: 4px; }
+.sheet-body { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 16px; padding: 4px; margin: 0 -4px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .field-hint { margin: 0; font-size: 0.85em; color: var(--muted); }
@@ -163,6 +165,7 @@ select {
 .model-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; max-height: 36dvh; border: 1px solid var(--line); border-radius: 10px; }
 .model-option { width: 100%; text-align: left; background: none; border: 0; padding: 10px; overflow-wrap: anywhere; cursor: pointer; }
 .model-option:hover, .model-option:focus-visible { background: var(--code); }
+.model-option:focus-visible { outline-offset: -2px; }
 .model-option[aria-selected="true"] { font-weight: 700; color: var(--accent); }
 .toggle { display: flex; align-items: center; gap: 8px; min-height: 40px; }
 .toggle input { width: 20px; height: 20px; }
