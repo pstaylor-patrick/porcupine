@@ -66,12 +66,23 @@ export function clearedCookie(secure: boolean): string {
   return `${COOKIE_NAME}=; HttpOnly;${secure ? " Secure;" : ""} SameSite=Strict; Path=/; Max-Age=0`;
 }
 
-/** Remote IP: X-Forwarded-For is trusted only when the socket peer is loopback (Caddy). */
+/**
+ * Peers allowed to set X-Forwarded-For: loopback, and Docker bridge addresses
+ * (172.16.0.0/12), where the shared shared Caddy container connects from.
+ */
+export function isTrustedProxy(peer: string): boolean {
+  const v4 = peer.startsWith("::ffff:") ? peer.slice(7) : peer;
+  if (v4 === "127.0.0.1" || peer === "::1") return true;
+  const m = /^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(v4);
+  const second = m ? Number(m[1]) : -1;
+  return second >= 16 && second <= 31;
+}
+
+/** Remote IP: X-Forwarded-For is trusted only when the socket peer is a trusted proxy (Caddy). */
 export function clientIp(req: IncomingMessage): string {
   const peer = req.socket.remoteAddress ?? "unknown";
-  const loopback = peer === "127.0.0.1" || peer === "::1" || peer === "::ffff:127.0.0.1";
   const xff = req.headers["x-forwarded-for"];
-  if (loopback && typeof xff === "string" && xff.trim()) {
+  if (isTrustedProxy(peer) && typeof xff === "string" && xff.trim()) {
     const parts = xff.split(",");
     return (parts[parts.length - 1] as string).trim();
   }

@@ -8,7 +8,7 @@ reachable only over the tailnet.
 
 - Node 22 LTS (per-user install, not system packages)
 - pi 0.99.1 under `~/.local` (`scripts/install-pi.sh`)
-- Docker (for Caddy and Terraform)
+- Docker (for Terraform). TLS is served by the shared Caddy edge in the proxy's config (site file sites/porcupine.caddy, route53 DNS-01); the hub must listen on the docker0 gateway: PORCUPINE_HUB_ADDR=172.17.0.1:8787
 - The VM, laptop and phone on the same tailnet
 - Secrets in `~/.config/porcupine/.env` (never committed)
 
