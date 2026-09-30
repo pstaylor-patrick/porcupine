@@ -11,6 +11,7 @@ export interface SessionSummary {
   model: string | null;
   isStreaming: boolean;
   startedAt: string;
+  piVersion?: string | null;
 }
 
 interface Entry {
@@ -77,6 +78,7 @@ export class Registry {
         model: meta.provider && meta.model ? `${meta.provider}/${meta.model}` : meta.model,
         isStreaming,
         startedAt: meta.startedAt,
+        piVersion: meta.piVersion,
       }))
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
   }

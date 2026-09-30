@@ -59,6 +59,7 @@ describe("app", () => {
       return Promise.resolve(responses[cmd.type] ?? { success: true });
     });
     const app = new App(conn);
+    app.isDesktop = () => false;
     app.bind();
     return { app, conn, sent };
   }
@@ -81,7 +82,7 @@ describe("app", () => {
     expect(sent[0]).toEqual({ type: "get_messages" });
     expect(document.querySelectorAll(".msg.user")).toHaveLength(1);
     expect(document.getElementById("transcript")?.textContent).toContain("earlier");
-    expect(document.getElementById("model-button")?.textContent).toBe("m1");
+    expect(document.getElementById("model-current")?.textContent).toBe("p/m1");
     expect((document.getElementById("thinking-select") as HTMLSelectElement).value).toBe("high");
   });
 
@@ -115,4 +116,165 @@ describe("app", () => {
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
     await vi.waitFor(() => expect(sent).toEqual([{ type: "abort" }]));
   });
+
+  const sessions = [
+    { id: "s1", name: "alpha", cwd: "/home/me/code/alpha", model: null, isStreaming: false, startedAt: "1", piVersion: "0.74.0" },
+    { id: "s2", name: "beta", cwd: "/srv/beta/", model: null, isStreaming: true, startedAt: "2" },
+  ];
+  const byId = (id: string) => document.getElementById(id) as HTMLElement;
+  const esc = () => new KeyboardEvent("keydown", { key: "Escape", cancelable: true, bubbles: true });
+
+  it("opens the sidebar flyout, lists sessions, and attaches on tap", () => {
+    const { app, conn } = setup({});
+    const attach = vi.spyOn(conn, "attach").mockImplementation((id) => {
+      conn.sessionId = id;
+    });
+    app.onFrame({ t: "sessions", sessions });
+    expect(byId("session-empty").hidden).toBe(true);
+    const items = [...document.querySelectorAll<HTMLButtonElement>(".session-item")];
+    expect(items.map((b) => b.querySelector(".session-cwd")?.textContent)).toEqual(["alpha", "beta"]);
+    expect(items[1]?.querySelector(".session-streaming")?.getAttribute("aria-label")).toBe("running");
+
+    byId("menu-button").click();
+    expect(byId("menu-button").getAttribute("aria-expanded")).toBe("true");
+    expect(byId("sidebar").dataset.open).toBe("true");
+    expect(byId("sidebar").getAttribute("aria-modal")).toBe("true");
+    expect(byId("scrim").hidden).toBe(false);
+
+    items[1]?.click();
+    expect(attach).toHaveBeenCalledWith("s2");
+    expect(byId("sidebar").dataset.open).toBe("false");
+    expect(byId("menu-button").getAttribute("aria-expanded")).toBe("false");
+    expect(byId("scrim").hidden).toBe(true);
+    expect(byId("session-title").textContent).toBe("beta");
+  });
+
+  it("shows an empty state and closes the flyout on scrim tap", () => {
+    const { app } = setup({});
+    app.onFrame({ t: "sessions", sessions: [] });
+    expect(byId("session-empty").hidden).toBe(false);
+    expect(byId("session-empty").textContent).toContain("porcupine");
+    byId("menu-button").click();
+    byId("scrim").click();
+    expect(byId("sidebar").dataset.open).toBe("false");
+    expect(app.overlays).toEqual([]);
+  });
+
+  it("navigates to the settings screen and back, and logs out with POST /api/logout", async () => {
+    const { app, conn } = setup({});
+    vi.spyOn(conn, "attach").mockImplementation((id) => {
+      conn.sessionId = id;
+    });
+    app.onFrame({ t: "sessions", sessions });
+    app.selectSession("s1");
+    byId("menu-button").click();
+    byId("settings-link").click();
+    expect(byId("settings").hidden).toBe(false);
+    expect(byId("sidebar").dataset.open).toBe("false");
+    expect(document.activeElement?.id).toBe("settings-back");
+    expect(byId("settings-pi-row").hidden).toBe(false);
+    expect(byId("settings-pi-version").textContent).toBe("0.74.0");
+    app.handlers().onStatus("open");
+    expect(byId("settings-conn").textContent).toBe("Connected");
+    byId("settings-back").click();
+    expect(byId("settings").hidden).toBe(true);
+
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 200 })));
+    vi.stubGlobal("fetch", fetchMock);
+    const navigate = vi.fn();
+    app.navigate = navigate;
+    byId("logout").click();
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith("/login"));
+    expect(fetchMock).toHaveBeenCalledWith("/api/logout", expect.objectContaining({ method: "POST" }));
+    vi.unstubAllGlobals();
+  });
+
+  it("omits the pi version row when the session has none", () => {
+    const { app, conn } = setup({});
+    vi.spyOn(conn, "attach").mockImplementation((id) => {
+      conn.sessionId = id;
+    });
+    app.onFrame({ t: "sessions", sessions });
+    app.selectSession("s2");
+    app.openSettings();
+    expect(byId("settings-pi-row").hidden).toBe(true);
+  });
+
+  it("opens and closes the session sheet from the header", () => {
+    const { app } = setup({});
+    byId("sheet-button").click();
+    expect(byId("sheet").dataset.open).toBe("true");
+    expect(byId("sheet-button").getAttribute("aria-expanded")).toBe("true");
+    expect(byId("sheet").getAttribute("role")).toBe("dialog");
+    expect(document.activeElement?.id).toBe("model-filter");
+    byId("sheet-close").click();
+    expect(byId("sheet").dataset.open).toBe("false");
+    expect(document.activeElement?.id).toBe("sheet-button");
+    byId("sheet-button").click();
+    byId("scrim").click();
+    expect(app.overlays).toEqual([]);
+  });
+
+  it("Esc closes an open overlay before it aborts", async () => {
+    const { app, conn, sent } = setup({});
+    conn.sessionId = "s1";
+    app.t.isStreaming = true;
+    const input = byId("input");
+    app.openSheet();
+    await Promise.resolve();
+    sent.length = 0;
+    input.focus();
+    input.dispatchEvent(esc());
+    expect(byId("sheet").dataset.open).toBe("false");
+    await Promise.resolve();
+    expect(sent).toEqual([]);
+
+    byId("menu-button").click();
+    document.dispatchEvent(esc());
+    expect(app.overlays).toEqual([]);
+    await Promise.resolve();
+    expect(sent).toEqual([]);
+
+    input.dispatchEvent(esc());
+    await vi.waitFor(() => expect(sent).toEqual([{ type: "abort" }]));
+  });
+
+  it("sends set_model and set_thinking_level with the right fields from the sheet", async () => {
+    const { app, conn, sent } = setup({
+      get_available_models: {
+        success: true,
+        data: { models: [{ provider: "vercel-ai-gateway", id: "anthropic/claude-sonnet-5.5" }, { provider: "vercel-ai-gateway", id: "openai/gpt-5" }] },
+      },
+    });
+    conn.sessionId = "s1";
+    app.openSheet();
+    await vi.waitFor(() => expect(document.querySelectorAll(".model-option")).toHaveLength(2));
+    const filter = byId("model-filter") as HTMLInputElement;
+    filter.value = "gpt";
+    filter.dispatchEvent(new Event("input"));
+    const options = document.querySelectorAll<HTMLButtonElement>(".model-option");
+    expect(options).toHaveLength(1);
+    options[0]?.click();
+    const select = byId("thinking-select") as HTMLSelectElement;
+    select.value = "high";
+    select.dispatchEvent(new Event("change"));
+    await vi.waitFor(() => expect(sent.map((c) => c.type)).toContain("set_thinking_level"));
+    expect(sent).toEqual([
+      { type: "get_available_models" },
+      { type: "set_model", provider: "vercel-ai-gateway", modelId: "openai/gpt-5" },
+      { type: "set_thinking_level", level: "high" },
+    ]);
+    await vi.waitFor(() => expect(byId("model-current").textContent).toBe("vercel-ai-gateway/openai/gpt-5"));
+  });
+
+  it("uses the steer toggle from the sheet for prompts sent while streaming", async () => {
+    const { app, conn, sent } = setup({});
+    conn.sessionId = "s1";
+    app.t.isStreaming = true;
+    (byId("steer") as HTMLInputElement).checked = true;
+    (byId("input") as HTMLTextAreaElement).value = "change course";
+    await app.send();
+    expect(sent[0]).toEqual({ type: "prompt", message: "change course", images: [], streamingBehavior: "steer" });
+  });
 });
+

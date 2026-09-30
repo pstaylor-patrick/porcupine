@@ -7,6 +7,7 @@ export interface SessionInfo {
   model: string | null;
   isStreaming: boolean;
   startedAt: string;
+  piVersion?: string | null;
 }
 
 export interface PiResponse {
