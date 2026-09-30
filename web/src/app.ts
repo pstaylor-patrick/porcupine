@@ -74,6 +74,8 @@ function isRec(v: unknown): v is Record<string, unknown> {
 export class App {
   t: Transcript = emptyTranscript();
   sessions: SessionInfo[] = [];
+  /** False until the hub's first session list, so a reload doesn't flash the empty states. */
+  private sessionsLoaded = false;
   models: ModelInfo[] = [];
   model: ModelInfo | null = null;
   thinkingLevel = "off";
@@ -330,6 +332,7 @@ export class App {
     switch (f.t) {
       case "sessions":
         this.sessions = f.sessions;
+        this.sessionsLoaded = true;
         if (!this.conn.sessionId && f.sessions.length === 1 && f.sessions[0]) this.attach(f.sessions[0].id);
         else if (this.conn.sessionId && !f.sessions.some((s) => s.id === this.conn.sessionId)) this.sessionGone();
         this.renderSessions();
@@ -635,8 +638,8 @@ export class App {
         return li;
       }),
     );
-    $("session-empty").hidden = this.sessions.length > 0;
-    $("empty").hidden = this.conn.sessionId !== null;
+    $("session-empty").hidden = !this.sessionsLoaded || this.sessions.length > 0;
+    this.syncEmpty();
     this.renderHeader();
     if (!$("settings").hidden) this.renderSettings();
   }
@@ -651,6 +654,10 @@ export class App {
     });
   }
 
+  private syncEmpty(): void {
+    $("empty").hidden = !this.sessionsLoaded || this.conn.sessionId !== null;
+  }
+
   render(): void {
     const nearBottom = this.main.scrollHeight - this.main.scrollTop - this.main.clientHeight < 120;
     this.view.render(this.t);
@@ -659,7 +666,7 @@ export class App {
     $("send").hidden = streaming && !this.input.value.trim();
     $("run-status").textContent = streaming ? "Running" : "Idle";
     document.body.classList.toggle("is-streaming", streaming);
-    $("empty").hidden = this.conn.sessionId !== null;
+    this.syncEmpty();
     if (nearBottom) this.main.scrollTop = this.main.scrollHeight;
   }
 }

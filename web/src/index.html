@@ -25,7 +25,7 @@
           <h2 id="sidebar-title" class="sidebar-title">Sessions</h2>
         </div>
         <ul id="session-list" class="session-list"></ul>
-        <div id="session-empty" class="session-empty scribble"><p class="scribble-panel">No live sessions. Start one in a tmux pane with <code>porcupine</code>.</p></div>
+        <div id="session-empty" hidden class="session-empty scribble"><p class="scribble-panel">No live sessions. Start one in a tmux pane with <code>porcupine</code>.</p></div>
         <div class="sidebar-foot">
           <button id="settings-link" type="button" class="sidebar-link">Settings</button>
         </div>
@@ -45,7 +45,7 @@
       </header>
       <main id="main" class="main">
         <div id="transcript" class="transcript" aria-label="Transcript"></div>
-        <div id="empty" class="empty scribble scene"><svg class="crayon crayon-scribble" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"><path pathLength="1" d="M-10 62C58 18 120 96 176 54S292 8 338 70S402 130 412 96"/><path pathLength="1" d="M18 250C64 180 30 120 96 104S204 168 246 120S300 20 362 44S398 176 330 214S214 238 170 280"/><path pathLength="1" d="M40 -6C92 60 70 148 138 176S250 214 298 160S352 72 410 150"/><path pathLength="1" d="M-6 170C46 150 70 214 128 222S226 170 262 218S330 300 408 262"/><path pathLength="1" d="M210 -8C182 40 236 76 214 118S150 196 206 236S290 254 300 310"/><path pathLength="1" d="M120 14C170 30 150 90 208 88S266 34 304 110C328 158 270 186 236 178"/></svg><p class="scribble-panel">No session attached. Start one in a tmux pane with <code>porcupine</code>.</p></div>
+        <div id="empty" hidden class="empty scribble scene"><svg class="crayon crayon-scribble" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"><path pathLength="1" d="M-10 62C58 18 120 96 176 54S292 8 338 70S402 130 412 96"/><path pathLength="1" d="M18 250C64 180 30 120 96 104S204 168 246 120S300 20 362 44S398 176 330 214S214 238 170 280"/><path pathLength="1" d="M40 -6C92 60 70 148 138 176S250 214 298 160S352 72 410 150"/><path pathLength="1" d="M-6 170C46 150 70 214 128 222S226 170 262 218S330 300 408 262"/><path pathLength="1" d="M210 -8C182 40 236 76 214 118S150 196 206 236S290 254 300 310"/><path pathLength="1" d="M120 14C170 30 150 90 208 88S266 34 304 110C328 158 270 186 236 178"/></svg><p class="scribble-panel">No session attached. Start one in a tmux pane with <code>porcupine</code>.</p></div>
       </main>
       <button id="dialog-reopen" type="button" class="dialog-reopen" hidden>pi is waiting for your answer</button>
       <form id="composer" class="composer" autocomplete="off">
