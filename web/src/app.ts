@@ -809,12 +809,20 @@ export class App {
 function pinToVisualViewport(): void {
   const vv = window.visualViewport;
   if (!vv) return;
+  // Only while a text field has focus (the keyboard is up): an installed iOS
+  // PWA reports a visual viewport shorter than the screen, which left a gap
+  // under the composer when pinned all the time.
   const sync = (): void => {
-    document.documentElement.style.setProperty("--app-height", `${vv.height}px`);
+    const el = document.activeElement;
+    const typing = el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && el.type !== "checkbox" && el.type !== "radio");
+    if (typing) document.documentElement.style.setProperty("--app-height", `${vv.height}px`);
+    else document.documentElement.style.removeProperty("--app-height");
     if (window.scrollY !== 0) window.scrollTo(0, 0);
   };
   vv.addEventListener("resize", sync);
   vv.addEventListener("scroll", sync);
+  document.addEventListener("focusin", sync);
+  document.addEventListener("focusout", () => setTimeout(sync, 0));
   sync();
 }
 
