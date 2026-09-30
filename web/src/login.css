@@ -1,12 +1,16 @@
-:root { color-scheme: light dark; --bg: #f6f5f1; --fg: #1d1f1c; --accent: #2f6b4f; --line: #d4d2ca; }
-@media (prefers-color-scheme: dark) { :root { --bg: #151816; --fg: #e8e6df; --accent: #6fbf94; --line: #343a36; } }
+/* Four colors only; mirrors styles.css. Pink is for dark-mode titles only. */
+:root { --cream: #f6efe0; --plum: #24122a; --lilac: #a070c8; --pink: #f2c4c4; --crayon: var(--lilac); }
+:root { color-scheme: light; --bg: var(--cream); --fg: var(--plum); --title: var(--plum); --focus: var(--lilac); --accent: var(--plum); --accent-fg: var(--cream); --line: var(--crayon); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --bg: var(--plum); --fg: var(--cream); --title: var(--pink); --focus: var(--lilac); --accent: var(--lilac); --accent-fg: var(--plum); --line: var(--crayon); } }
+:root[data-theme="dark"] { color-scheme: dark; --bg: var(--plum); --fg: var(--cream); --title: var(--pink); --focus: var(--lilac); --accent: var(--lilac); --accent-fg: var(--plum); --line: var(--crayon); }
 * { box-sizing: border-box; }
 body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--fg); font: 17px/1.4 system-ui, -apple-system, sans-serif;
   display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
 .login { width: min(360px, 100%); }
-h1 { font-size: 28px; margin: 0 0 16px; }
+h1 { font-size: 28px; margin: 0 0 16px; color: var(--title); }
 form { display: grid; gap: 10px; }
 input { font: inherit; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: inherit; }
-button { font: inherit; padding: 12px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; font-weight: 600; }
-.error { display: none; color: #c0392b; }
+button { font: inherit; padding: 12px; border-radius: 10px; border: 0; background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.error { display: none; color: var(--fg); font-weight: 600; }
 .error:target { display: block; }
