@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { basename } from "node:path";
 
-export const DEFAULT_PROVIDER = "vercel-ai-gateway";
+export const DEFAULT_PROVIDER = "openrouter";
 export const DEFAULT_MODEL = "anthropic/claude-opus-5.5";
 export const DEFAULT_THINKING = "low";
 
@@ -50,11 +50,12 @@ export function buildPiArgs(userArgs: string[], extensions: string[] = []): stri
   return [...out, ...userArgs];
 }
 
-/** Child env: process env plus AI_GATEWAY_API_KEY mapping, minus porcupine secrets. */
+/** Child env: process env plus provider keys from the env file, minus porcupine secrets. */
 export function buildChildEnv(processEnv: NodeJS.ProcessEnv, fileEnv: Record<string, string>): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...processEnv };
   const key = fileEnv.VERCEL_AI_GATEWAY_API_KEY ?? processEnv.VERCEL_AI_GATEWAY_API_KEY;
   if (!env.AI_GATEWAY_API_KEY && key) env.AI_GATEWAY_API_KEY = key;
+  if (!env.OPENROUTER_API_KEY && fileEnv.OPENROUTER_API_KEY) env.OPENROUTER_API_KEY = fileEnv.OPENROUTER_API_KEY;
   for (const k of SECRET_KEYS) delete env[k];
   return env;
 }

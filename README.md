@@ -25,7 +25,7 @@ run shell commands on the host through the agent.
 - HTTPS in front of the hub. Service workers and `Secure` cookies need it;
   [examples/Caddyfile](examples/Caddyfile) shows one way.
 - A model provider key pi can use. The default model is
-  `vercel-ai-gateway` / `anthropic/claude-opus-5.5` with low thinking.
+  `openrouter` / `anthropic/claude-opus-5.5` with low thinking.
 
 ## Install
 
@@ -53,6 +53,7 @@ Settings come from the process environment or the env file
 | `PORCUPINE_RPC_PASSWORD` | required | Login password |
 | `PORCUPINE_COOKIE_SECRET` | required | Cookie signing key, `openssl rand -hex 32` |
 | `PORCUPINE_HUB_ADDR` | `127.0.0.1:8787` | Hub listen address; use a Docker bridge IP if the proxy runs in Docker |
+| `OPENROUTER_API_KEY` | | OpenRouter key for the default provider |
 | `VERCEL_AI_GATEWAY_API_KEY` | | Passed to pi as `AI_GATEWAY_API_KEY` |
 | `PORCUPINE_RUNTIME_DIR` | `$XDG_RUNTIME_DIR/porcupine` | Session sockets |
 

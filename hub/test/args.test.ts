@@ -40,11 +40,16 @@ describe("parseCliArgs", () => {
 describe("buildChildEnv", () => {
   const fileEnv = {
     VERCEL_AI_GATEWAY_API_KEY: "vk",
+    OPENROUTER_API_KEY: "ok",
     PORCUPINE_RPC_PASSWORD: "hunter2",
     PORCUPINE_COOKIE_SECRET: "c",
   };
   it("maps VERCEL_AI_GATEWAY_API_KEY to AI_GATEWAY_API_KEY", () => {
     expect(buildChildEnv({ PATH: "/bin" }, fileEnv).AI_GATEWAY_API_KEY).toBe("vk");
+  });
+  it("passes OPENROUTER_API_KEY from the env file", () => {
+    expect(buildChildEnv({ PATH: "/bin" }, fileEnv).OPENROUTER_API_KEY).toBe("ok");
+    expect(buildChildEnv({ OPENROUTER_API_KEY: "mine" }, fileEnv).OPENROUTER_API_KEY).toBe("mine");
   });
   it("keeps an existing AI_GATEWAY_API_KEY", () => {
     expect(buildChildEnv({ AI_GATEWAY_API_KEY: "mine" }, fileEnv).AI_GATEWAY_API_KEY).toBe("mine");
