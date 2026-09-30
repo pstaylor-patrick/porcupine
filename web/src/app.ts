@@ -374,6 +374,7 @@ export class App {
             this.thinkingLevel = f.event.level;
             this.renderHeader();
           }
+          if (f.event.type === "porcupine_failover") this.applyFailover(f.event.to);
           this.queueRender();
         }
         return;
@@ -438,6 +439,15 @@ export class App {
     if (!r.success) this.notice("error", `could not load history: ${r.error ?? "unknown error"}`);
     void this.refreshState();
     this.queueRender();
+  }
+
+  /** The CLI switched provider after a rate limit; the model id stays the same. */
+  applyFailover(to: unknown): void {
+    if (!isRec(to) || typeof to.provider !== "string" || typeof to.model !== "string") return;
+    const known = this.models.find((m) => m.provider === to.provider && m.id === to.model);
+    this.model = known ?? { ...(this.model?.id === to.model ? this.model : {}), provider: to.provider, id: to.model };
+    this.renderHeader();
+    this.renderModels();
   }
 
   async refreshState(): Promise<void> {

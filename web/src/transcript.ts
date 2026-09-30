@@ -52,6 +52,22 @@ function isRec(v: unknown): v is Rec {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+const PROVIDER_LABELS: Readonly<Record<string, string>> = {
+  openrouter: "OpenRouter",
+  "vercel-ai-gateway": "Vercel AI Gateway",
+};
+
+function providerName(ref: unknown): string {
+  const p = typeof ref === "object" && ref !== null ? (ref as { provider?: unknown }).provider : undefined;
+  const id = typeof p === "string" ? p : "unknown provider";
+  return PROVIDER_LABELS[id] ?? id;
+}
+
+/** Status line for a CLI failover, e.g. "Rate-limited on Vercel AI Gateway; switched to OpenRouter". */
+export function failoverText(from: unknown, to: unknown): string {
+  return `Rate-limited on ${providerName(from)}; switched to ${providerName(to)}`;
+}
+
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
@@ -327,6 +343,9 @@ export function applyEvent(t: Transcript, ev: Rec): void {
       push(t, { kind: "notice", level, text: str(ev.text) });
       return;
     }
+    case "porcupine_failover":
+      push(t, { kind: "status", text: failoverText(ev.from, ev.to) });
+      return;
     case "extension_error":
       push(t, { kind: "notice", level: "error", text: `extension error (${str(ev.event)}): ${str(ev.error)}` });
       return;

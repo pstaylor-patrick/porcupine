@@ -87,6 +87,40 @@ describe("app", () => {
     expect((document.getElementById("thinking-select") as HTMLSelectElement).value).toBe("high");
   });
 
+  it("selects the new provider's model on a porcupine_failover event", async () => {
+    const id = "anthropic/claude-opus-5.5";
+    const { app, conn } = setup({
+      get_available_models: {
+        success: true,
+        data: {
+          models: [
+            { provider: "vercel-ai-gateway", id, name: "Opus via Vercel" },
+            { provider: "openrouter", id, name: "Opus via OpenRouter" },
+          ],
+        },
+      },
+    });
+    conn.sessionId = "s1";
+    await app.loadModels();
+    await app.setModel({ provider: "vercel-ai-gateway", id, name: "Opus via Vercel" });
+    const selected = (): string[] =>
+      [...document.querySelectorAll('[aria-selected="true"] .model-option-name')].map(
+        (e) => e.textContent ?? "",
+      );
+    expect(selected()).toContain("Opus via Vercel");
+    app.onFrame({
+      t: "event",
+      session: "s1",
+      seq: 5,
+      event: { type: "porcupine_failover", from: { provider: "vercel-ai-gateway", model: id }, to: { provider: "openrouter", model: id }, reason: "429" },
+    });
+    app.render();
+    expect(selected()).toContain("Opus via OpenRouter");
+    expect(selected()).not.toContain("Opus via Vercel");
+    expect(document.querySelector("#model-card .model-card-name")?.textContent).toBe("Opus via OpenRouter");
+    expect(document.getElementById("transcript")?.textContent).toContain("switched to OpenRouter");
+  });
+
   it("uses the documented set_model and set_thinking_level field names", async () => {
     const { app, sent } = setup({});
     await app.setModel({ provider: "vercel-ai-gateway", id: "anthropic/claude-sonnet-5.5" });

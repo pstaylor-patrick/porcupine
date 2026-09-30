@@ -107,3 +107,11 @@ export interface PorcupineNotice {
   level: "info" | "warn" | "error";
   text: string;
 }
+
+/** The CLI switched provider after a rate limit and re-sent the last prompt. */
+export interface PorcupineFailover {
+  type: "porcupine_failover";
+  from: { provider: string; model: string };
+  to: { provider: string; model: string };
+  reason: string;
+}

@@ -119,3 +119,18 @@ describe("errorSummary", () => {
     expect(errorSummary("x".repeat(400))).toBe(`${"x".repeat(300)}...`);
   });
 });
+
+describe("porcupine_failover", () => {
+  it("renders a status line naming both providers", () => {
+    const t = emptyTranscript();
+    applyEvent(t, {
+      type: "porcupine_failover",
+      from: { provider: "vercel-ai-gateway", model: "anthropic/claude-opus-5.5" },
+      to: { provider: "openrouter", model: "anthropic/claude-opus-5.5" },
+      reason: "429 Too Many Requests",
+    });
+    const last = t.items[t.items.length - 1];
+    expect(last?.kind).toBe("status");
+    expect(last && "text" in last ? last.text : "").toBe("Rate-limited on Vercel AI Gateway; switched to OpenRouter");
+  });
+});
