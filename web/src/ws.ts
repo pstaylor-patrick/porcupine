@@ -95,9 +95,10 @@ export class Connection {
     try {
       const raw = this.o.storage?.getItem(CURSOR_KEY);
       if (!raw) return;
-      const c = JSON.parse(raw) as { sessionId?: unknown; lastSeq?: unknown };
+      // Only the session survives a reload. The new page has an empty
+      // transcript, so it must replay from the start, not from lastSeq.
+      const c = JSON.parse(raw) as { sessionId?: unknown };
       if (typeof c.sessionId === "string") this.sessionId = c.sessionId;
-      if (typeof c.lastSeq === "number") this.lastSeq = c.lastSeq;
     } catch {
       // storage unavailable or corrupt: start fresh
     }

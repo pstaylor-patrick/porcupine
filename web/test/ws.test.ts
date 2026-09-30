@@ -78,7 +78,7 @@ describe("connection", () => {
     expect(events.map((f) => (f.t === "event" ? f.seq : 0))).toEqual([1, 2, 3, 4]);
   });
 
-  it("restores the cursor from storage", () => {
+  it("restores the session but replays from the start after a reload", () => {
     const h = harness();
     h.store.set("porcupine.cursor", JSON.stringify({ sessionId: "s9", lastSeq: 41 }));
     const conn2 = new Connection(
@@ -96,7 +96,7 @@ describe("connection", () => {
     );
     conn2.connect();
     h.sockets[0]!.open();
-    expect(h.sockets[0]!.sent).toContainEqual({ t: "attach", session: "s9", since: 41 });
+    expect(h.sockets[0]!.sent).toContainEqual({ t: "attach", session: "s9", since: null });
   });
 
   it("correlates command results by cid", async () => {
