@@ -43,7 +43,7 @@ jobs:
       - id: tf
         run: echo "present=$(ls infra/*.tf >/dev/null 2>&1 && echo true || echo false)" >> "$GITHUB_OUTPUT"
       - if: steps.tf.outputs.present == 'true'
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: 1.10.5
       - if: steps.tf.outputs.present == 'true'
