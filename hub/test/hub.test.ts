@@ -10,6 +10,7 @@ import { COOKIE_NAME, signCookie } from "../src/server/auth.js";
 import type { HubConfig } from "../src/server/config.js";
 import { createHub, type Hub } from "../src/server/hub.js";
 import { isPublicPath } from "../src/server/static.js";
+import { uploadConfig } from "../src/server/uploads/config.js";
 
 const FAKE_PI = fileURLToPath(new URL("./fixtures/fake-pi.mjs", import.meta.url));
 const ORIGIN = "https://porcupine.example.com";
@@ -47,7 +48,7 @@ beforeEach(async () => {
   mkdirSync(join(dir, "web", "crayon"));
   writeFileSync(join(dir, "web", "crayon", "scribble.svg"), "<svg/>");
   session = null;
-  hub = createHub({ config: config(), log: () => undefined, rescanMs: 100 });
+  hub = createHub({ config: config(), log: () => undefined, rescanMs: 100, uploads: uploadConfig({}, dir), maxUploadBytes: 1024 });
   const { port } = await hub.listen();
   base = `http://127.0.0.1:${port}`;
 });
@@ -196,6 +197,51 @@ describe("WebSocket upgrade", () => {
     const b = await browser();
     b.send({ t: "ping" });
     await b.until((f) => f.t === "pong");
+  });
+});
+
+describe("uploads", () => {
+  it("rejects unauthenticated requests with 401", async () => {
+    expect((await fetch(`${base}/api/uploads/config`)).status).toBe(401);
+    const r = await fetch(`${base}/api/uploads?session=x&name=a.txt`, { method: "POST", headers: { Origin: ORIGIN }, body: "hi" });
+    expect(r.status).toBe(401);
+  });
+  it("rejects a bad or missing Origin with 403", async () => {
+    const bad = await fetch(`${base}/api/uploads?session=x&name=a.txt`, { method: "POST", headers: { Cookie: cookie(), Origin: "https://evil.example" }, body: "hi" });
+    expect(bad.status).toBe(403);
+    const none = await fetch(`${base}/api/uploads?session=x&name=a.txt`, { method: "POST", headers: { Cookie: cookie() }, body: "hi" });
+    expect(none.status).toBe(403);
+  });
+  it("round trips an authed upload into the session dir, 404s an unknown session, 413s over cap", async () => {
+    const s = await startFake();
+    await waitFor(() => hub.registry.list().length === 1);
+    const headers = { Cookie: cookie(), Origin: ORIGIN, "Content-Type": "text/plain" };
+    const unknown = await fetch(`${base}/api/uploads?session=nope&name=a.txt`, { method: "POST", headers, body: "hi" });
+    expect(unknown.status).toBe(404);
+    const r = await fetch(`${base}/api/uploads?session=${s.meta.id}&name=${encodeURIComponent("../notes.txt")}`, { method: "POST", headers, body: "hello" });
+    expect(r.status).toBe(201);
+    expect(r.headers.get("cache-control")).toBe("no-store");
+    const body = (await r.json()) as { id: string; kind: string; name: string; size: number; path: string };
+    expect(body).toMatchObject({ kind: "text", name: "notes.txt", size: 5 });
+    expect(body.path).toBe(join(dir, ".local", "share", "porcupine", "uploads", s.meta.id, body.id, "notes.txt"));
+    expect(existsSync(body.path)).toBe(true);
+    const big = await fetch(`${base}/api/uploads?session=${s.meta.id}&name=big.bin`, { method: "POST", headers, body: "x".repeat(2048) });
+    expect(big.status).toBe(413);
+  });
+  it("config endpoint reflects env overrides", async () => {
+    const other = createHub({
+      config: config(),
+      log: () => undefined,
+      uploads: uploadConfig({ PORCUPINE_CONFIRM_USD: "0.25", PORCUPINE_CONFIRM_MINUTES: "3" }, dir),
+    });
+    const { port } = await other.listen();
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/api/uploads/config`, { headers: { Cookie: cookie() } });
+      expect(r.status).toBe(200);
+      expect(await r.json()).toEqual({ confirmUsd: 0.25, confirmMinutes: 3, whisper: false, maxBytes: 2 * 1024 ** 3 });
+    } finally {
+      await other.close();
+    }
   });
 });
 

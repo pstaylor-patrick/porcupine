@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Duplex } from "node:stream";
 import { WebSocketServer } from "ws";
@@ -16,6 +17,9 @@ import {
 import type { HubConfig } from "./config.js";
 import { Registry } from "./registry.js";
 import { BrowserRelay, MAX_BROWSER_FRAME } from "./relay.js";
+import { MAX_UPLOAD_BYTES, RETENTION_DAYS, uploadConfig, type UploadConfig } from "./uploads/config.js";
+import { pruneUploads } from "./uploads/retention.js";
+import { handleUploads } from "./uploads/routes.js";
 import { applySecurityHeaders, isPublicPath, serveStatic } from "./static.js";
 
 export interface HubOptions {
@@ -24,6 +28,8 @@ export interface HubOptions {
   limiter?: LoginRateLimiter;
   log?: (line: string) => void;
   rescanMs?: number;
+  uploads?: UploadConfig;
+  maxUploadBytes?: number;
 }
 
 export interface Hub {
@@ -91,6 +97,25 @@ export function createHub(opts: HubOptions): Hub {
   };
 
   const authed = (req: IncomingMessage): boolean => isAuthed(req, config.cookieSecret, now);
+  const uploads = opts.uploads ?? uploadConfig(process.env, homedir(), log);
+  const uploadCtx = {
+    config: uploads,
+    maxBytes: opts.maxUploadBytes ?? MAX_UPLOAD_BYTES,
+    origins: config.origins,
+    authed,
+    sessionExists: (id: string) => registry.socketPath(id) !== null,
+    now,
+    log,
+  };
+  let retentionTimer: NodeJS.Timeout | null = null;
+  const prune = (): void => {
+    try {
+      const n = pruneUploads(uploads.root, now(), RETENTION_DAYS);
+      if (n > 0) log(`uploads: pruned ${n} older than ${RETENTION_DAYS} days`);
+    } catch (e) {
+      log(`uploads: prune failed: ${(e as Error).message}`);
+    }
+  };
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     applySecurityHeaders(res);
@@ -132,6 +157,7 @@ export function createHub(opts: HubOptions): Hub {
       res.end(JSON.stringify({ authenticated: ok }) + "\n");
       return;
     }
+    if (await handleUploads(req, res, uploadCtx)) return;
     if (path.startsWith("/api/")) {
       res.writeHead(404, { "Content-Type": "text/plain" }).end("not found\n");
       return;
@@ -180,6 +206,9 @@ export function createHub(opts: HubOptions): Hub {
     registry,
     async listen() {
       await registry.start();
+      prune();
+      retentionTimer = setInterval(prune, 24 * 60 * 60 * 1000);
+      retentionTimer.unref();
       await new Promise<void>((resolve, reject) => {
         server.once("error", reject);
         server.listen(config.port, config.host, () => resolve());
@@ -189,6 +218,7 @@ export function createHub(opts: HubOptions): Hub {
     },
     async close() {
       registry.stop();
+      if (retentionTimer) clearInterval(retentionTimer);
       for (const c of wss.clients) c.terminate();
       wss.close();
       server.closeAllConnections();
