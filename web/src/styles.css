@@ -217,13 +217,13 @@ select {
 .model-card-vendor, .model-card-detail { font-size: 0.875rem; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
 .model-card[data-empty="true"] .model-card-name { font-weight: 400; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
 .sheet input[type="search"] { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 16px; }
-.model-browser { overflow-y: auto; max-height: 40dvh; border: 1px solid var(--line); border-radius: 10px; }
+.model-browser { position: relative; overflow-y: auto; max-height: 40dvh; border: 1px solid var(--line); border-radius: 10px; }
 .model-browser:has(.model-recent[hidden]):has(.model-groups:empty) { display: none; }
 .model-list { list-style: none; margin: 0; padding: 0; }
 .model-section-title { margin: 0; padding: 8px 10px 4px; font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
 .model-recent { border-bottom: 1px solid var(--line); }
 .model-group + .model-group { border-top: 1px solid var(--line); }
-.model-group > summary { display: flex; align-items: center; min-height: 44px; padding: 0 10px; font-weight: 600; cursor: pointer; }
+.model-group > summary { position: sticky; top: 0; z-index: 1; background: var(--panel); display: flex; align-items: center; min-height: 44px; padding: 0 10px; font-weight: 600; cursor: pointer; }
 .model-group > summary:hover, .model-group > summary:focus-visible { background: var(--code); }
 .model-group > summary:focus-visible { outline-offset: -2px; }
 .model-group-count { margin-left: 6px; font-weight: 400; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
@@ -421,3 +421,10 @@ details > :not(summary) { padding: 0 12px 10px; }
   .crayon-scribble path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: crayon-draw 1.4s ease-out forwards; }
 }
 @keyframes crayon-draw { to { stroke-dashoffset: 0; } }
+
+.filter-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.filter-chip { min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--fg); font: inherit; cursor: pointer; }
+.filter-chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.filter-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.vendor-jump { min-height: 44px; width: 100%; margin-bottom: 8px; }
+.vendor-jump[hidden] { display: none; }

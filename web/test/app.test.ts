@@ -349,6 +349,74 @@ describe("app", () => {
     localStorage.clear();
   });
 
+  it("filters with capability chips and jumps to a vendor group", async () => {
+    localStorage.clear();
+    const { app, conn } = setup({
+      get_available_models: {
+        success: true,
+        data: {
+          models: [
+            { provider: "g", id: "anthropic/claude-opus-5.5", reasoning: true, input: ["text", "image"] },
+            { provider: "g", id: "anthropic/claude-haiku-5", reasoning: false, input: ["text", "image"] },
+            { provider: "g", id: "openai/gpt-5", reasoning: true, input: ["text"] },
+            { provider: "g", id: "zai/glm-5", reasoning: false, input: ["text"] },
+          ],
+        },
+      },
+    });
+    conn.sessionId = "s1";
+    app.openSheet();
+    await vi.waitFor(() => expect(document.querySelectorAll("#model-groups details")).toHaveLength(3));
+    const chips = [...document.querySelectorAll<HTMLButtonElement>("#model-chips .filter-chip")];
+    expect(chips.map((c) => c.textContent)).toEqual(["Thinking", "Images", "400K+", "Cheap"]);
+    expect(chips.every((c) => c.getAttribute("aria-pressed") === "false")).toBe(true);
+    const chip = (cap: string) => document.querySelector<HTMLButtonElement>(`#model-chips [data-cap="${cap}"]`)!;
+    const names = () => [...document.querySelectorAll("#model-groups .model-option-name")].map((n) => n.textContent);
+
+    chip("thinking").click();
+    expect(chip("thinking").getAttribute("aria-pressed")).toBe("true");
+    expect(names()).toEqual(["anthropic/claude-opus-5.5", "openai/gpt-5"]);
+    expect([...document.querySelectorAll<HTMLDetailsElement>("#model-groups details")].every((d) => d.open)).toBe(true);
+
+    chip("images").click();
+    expect(names()).toEqual(["anthropic/claude-opus-5.5"]);
+    expect(byId("vendor-jump").hidden).toBe(true);
+
+    chip("images").click();
+    const filter = byId("model-filter") as HTMLInputElement;
+    filter.value = "gpt";
+    filter.dispatchEvent(new Event("input"));
+    expect(names()).toEqual(["openai/gpt-5"]);
+    filter.value = "";
+    filter.dispatchEvent(new Event("input"));
+
+    byId("sheet-close").click();
+    app.openSheet();
+    expect(chip("thinking").getAttribute("aria-pressed")).toBe("true");
+    expect(names()).toEqual(["anthropic/claude-opus-5.5", "openai/gpt-5"]);
+
+    chip("thinking").click();
+    expect(chip("thinking").getAttribute("aria-pressed")).toBe("false");
+    expect(names()).toHaveLength(4);
+
+    const jump = byId("vendor-jump") as HTMLSelectElement;
+    expect(jump.hidden).toBe(false);
+    expect([...jump.options].map((o) => [o.value, o.textContent])).toEqual([
+      ["", "Jump to vendor"],
+      ["anthropic", "anthropic (2)"],
+      ["openai", "openai (1)"],
+      ["zai", "zai (1)"],
+    ]);
+    const zai = document.querySelector<HTMLDetailsElement>('#model-groups details[data-vendor="zai"]')!;
+    expect(zai.open).toBe(false);
+    jump.value = "zai";
+    jump.dispatchEvent(new Event("change"));
+    expect(zai.open).toBe(true);
+    expect(jump.value).toBe("");
+    expect(document.activeElement).toBe(zai.querySelector("summary"));
+    localStorage.clear();
+  });
+
   it("shows distinct model sheet states", async () => {
     const { app, conn } = setup({ get_available_models: { success: true, data: { models: [] } } });
     app.openSheet();

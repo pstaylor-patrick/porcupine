@@ -3,7 +3,10 @@ import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./que
 import { TranscriptView } from "./render.js";
 import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./transcript.js";
 import {
+  CAPABILITIES,
+  CHEAP_INPUT_MAX,
   filterModels,
+  LONG_CONTEXT_MIN,
   groupByVendor,
   loadRecent,
   parseModel,
@@ -11,6 +14,7 @@ import {
   rowDetail,
   sheetState,
   vendorOf,
+  type Capability,
   type ModelInfo,
   type RecentStorage,
   type SheetState,
@@ -101,6 +105,8 @@ export class App {
   /** The dialog shown in the sheet; hiding the sheet keeps it pending. */
   private shownDialog: Dialog | null = null;
   private readonly returnFocus = new Map<Overlay, HTMLElement | null>();
+  /** Selected capability chips; memory only, kept across sheet open and close. */
+  private readonly caps = new Set<Capability>();
   private modelsRequest: Promise<void> | null = null;
   /** Session the in-flight model request was sent for; a response for another session is dropped. */
   private modelsFor: string | null = null;
@@ -171,6 +177,8 @@ export class App {
       void this.setThinking((e.target as HTMLSelectElement).value);
     });
     ($("model-filter") as HTMLInputElement).addEventListener("input", () => this.renderModels());
+    this.buildChips();
+    ($("vendor-jump") as HTMLSelectElement).addEventListener("change", (e) => this.jumpToVendor(e.target as HTMLSelectElement));
     $("new-session").addEventListener("click", () => void this.newSession());
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && e.target !== this.input && document.activeElement !== this.input && this.t.isStreaming) void this.abort();
@@ -553,26 +561,28 @@ export class App {
       models: this.models,
     });
     const q = ($("model-filter") as HTMLInputElement).value.trim();
-    const shown = state === "ready" ? filterModels(this.models, q) : [];
+    const filtering = q !== "" || this.caps.size > 0;
+    const shown = state === "ready" ? filterModels(this.models, q, this.caps) : [];
     const noMatches = state === "ready" && shown.length === 0;
     status.hidden = state === "ready" && !noMatches;
     status.dataset.state = noMatches ? "no-matches" : state;
     if (state === "error") status.textContent = `Could not load models: ${this.modelsError ?? "failed"}`;
     else if (state !== "ready") status.textContent = SHEET_MESSAGES[state];
-    else status.textContent = noMatches ? "No matches" : "";
+    else status.textContent = noMatches ? (this.caps.size > 0 ? "No models match these filters" : "No matches") : "";
 
     const byId = new Map(this.models.map((m) => [m.id, m]));
-    const recentModels = q || state !== "ready" ? [] : loadRecent(recentStorage()).flatMap((id) => byId.get(id) ?? []);
+    const recentModels = filtering || state !== "ready" ? [] : loadRecent(recentStorage()).flatMap((id) => byId.get(id) ?? []);
     recent.hidden = recentModels.length === 0;
     $("model-recent-list").replaceChildren(...recentModels.map((m) => this.modelOption(m)));
 
     const currentVendor = this.model ? vendorOf(this.model.id, this.model.provider) : null;
+    const grouped = groupByVendor(shown);
     groups.replaceChildren(
-      ...groupByVendor(shown).map((g) => {
+      ...grouped.map((g) => {
         const details = document.createElement("details");
         details.className = "model-group";
         details.dataset.vendor = g.vendor;
-        details.open = q !== "" || g.vendor === currentVendor;
+        details.open = filtering || g.vendor === currentVendor;
         const summary = document.createElement("summary");
         summary.append(g.vendor);
         const count = document.createElement("span");
@@ -588,6 +598,61 @@ export class App {
         return details;
       }),
     );
+
+    const jump = $("vendor-jump") as HTMLSelectElement;
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Jump to vendor";
+    jump.replaceChildren(
+      placeholder,
+      ...grouped.map((g) => {
+        const o = document.createElement("option");
+        o.value = g.vendor;
+        o.textContent = `${g.vendor} (${g.count})`;
+        return o;
+      }),
+    );
+    jump.value = "";
+    jump.hidden = grouped.length < 2;
+  }
+
+  private buildChips(): void {
+    const titles: Record<Capability, { label: string; title: string }> = {
+      thinking: { label: "Thinking", title: "Supports extended thinking" },
+      images: { label: "Images", title: "Accepts image input" },
+      long: { label: `${LONG_CONTEXT_MIN / 1000}K+`, title: `Context window of ${LONG_CONTEXT_MIN.toLocaleString("en-US")} tokens or more` },
+      cheap: { label: "Cheap", title: `Input $${CHEAP_INPUT_MAX.toFixed(2)} per million tokens or less` },
+    };
+    $("model-chips").replaceChildren(
+      ...CAPABILITIES.map(({ key }) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "filter-chip";
+        b.dataset.cap = key;
+        b.textContent = titles[key].label;
+        b.title = titles[key].title;
+        b.setAttribute("aria-pressed", this.caps.has(key) ? "true" : "false");
+        b.addEventListener("click", () => {
+          if (this.caps.has(key)) this.caps.delete(key);
+          else this.caps.add(key);
+          b.setAttribute("aria-pressed", this.caps.has(key) ? "true" : "false");
+          this.renderModels();
+        });
+        return b;
+      }),
+    );
+  }
+
+  private jumpToVendor(select: HTMLSelectElement): void {
+    const vendor = select.value;
+    select.value = "";
+    if (!vendor) return;
+    const details = [...$("model-groups").querySelectorAll<HTMLDetailsElement>("details.model-group")].find((d) => d.dataset.vendor === vendor);
+    if (!details) return;
+    details.open = true;
+    const browser = details.closest<HTMLElement>(".model-browser");
+    if (browser) browser.scrollTop = details.offsetTop - browser.offsetTop;
+    details.querySelector("summary")?.focus();
   }
 
   private modelOption(m: ModelInfo): HTMLLIElement {
