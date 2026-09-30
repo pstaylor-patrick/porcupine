@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { rmSync, writeFileSync, chmodSync, existsSync, readFileSync } from "node:fs";
-import type { PiEvent, SessionMeta } from "../shared/protocol.js";
+import type { PiCommand, PiEvent, PiResponse, PorcupineUiResolved, SessionMeta } from "../shared/protocol.js";
 import { ensureRuntimeDir, sessionPaths } from "../shared/paths.js";
 import { EventLog, type EventLogLimits } from "./event-log.js";
 import type { LogFn } from "./log.js";
@@ -74,6 +74,14 @@ export async function startSession(o: SessionOptions): Promise<Session> {
     server?.broadcast({ t: "event", seq: entry.seq, event: entry.event });
   };
 
+  // Dialog ids forwarded to the browser and not yet answered.
+  const pendingDialogs = new Set<string>();
+  const resolveDialog = (id: string): void => {
+    pendingDialogs.delete(id);
+    const resolved: PorcupineUiResolved = { type: "porcupine_ui_resolved", id };
+    publish(resolved as unknown as PiEvent);
+  };
+
   let cleaned = false;
   const cleanup = (): void => {
     if (cleaned) return;
@@ -91,9 +99,12 @@ export async function startSession(o: SessionOptions): Promise<Session> {
       if (e.type === "agent_start") o.log("run started");
       if (e.type === "agent_settled") o.log("run settled");
       publish(e);
+      // Pi resolves a dialog itself on timeout or abort; the run settling means none is still open.
+      if (e.type === "agent_settled") for (const id of [...pendingDialogs]) resolveDialog(id);
     },
     onUiRequest: (req) => {
-      const d = handleUiRequest(req);
+      const d = handleUiRequest(req, { browserAttached: (server?.attachedCount ?? 0) > 0 });
+      if (d.forward) pendingDialogs.add(d.forward);
       if (d.response) pi.writeRaw(d.response);
       if (d.event) publish(d.event);
       if (d.log) o.log(d.log);
@@ -131,13 +142,22 @@ export async function startSession(o: SessionOptions): Promise<Session> {
     return shuttingDown;
   };
 
+  // Pi has no response for extension_ui_response, so answer the browser here.
+  const answerDialog = (cmd: PiCommand): Promise<PiResponse> => {
+    const reply = uiResponse(cmd);
+    if (!reply || !pendingDialogs.has(reply.id)) return Promise.resolve({ success: false, error: "no such dialog" });
+    pi.writeRaw(reply);
+    resolveDialog(reply.id);
+    return Promise.resolve({ success: true });
+  };
+
   try {
     if (existsSync(paths.sock)) rmSync(paths.sock);
     server = new SocketServer({
       path: paths.sock,
       log: events,
       meta: () => meta,
-      send: (cmd) => pi.send(cmd),
+      send: (cmd) => (cmd.type === "extension_ui_response" ? answerDialog(cmd) : pi.send(cmd)),
       onConnect: () => o.log("hub connected"),
       onDisconnect: () => o.log("hub disconnected"),
     });
@@ -162,6 +182,21 @@ export async function startSession(o: SessionOptions): Promise<Session> {
   }
 
   return { meta, paths, events, pi, done, shutdown, cleanup };
+}
+
+type UiResponse =
+  | { type: "extension_ui_response"; id: string; value: string }
+  | { type: "extension_ui_response"; id: string; confirmed: boolean }
+  | { type: "extension_ui_response"; id: string; cancelled: true };
+
+/** Rebuilds a browser's answer with only the fields pi documents (rpc-extension-ui.md). */
+export function uiResponse(cmd: PiCommand): UiResponse | null {
+  const { id, value, confirmed, cancelled } = cmd;
+  if (typeof id !== "string" || !id) return null;
+  if (cancelled === true) return { type: "extension_ui_response", id, cancelled: true };
+  if (typeof value === "string") return { type: "extension_ui_response", id, value };
+  if (typeof confirmed === "boolean") return { type: "extension_ui_response", id, confirmed };
+  return null;
 }
 
 export function readPinnedPiVersion(packageJsonUrl: URL): string | null {

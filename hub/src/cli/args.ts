@@ -40,8 +40,8 @@ function hasFlag(args: string[], flag: string): boolean {
   return args.some((a) => a === flag || a.startsWith(`${flag}=`));
 }
 
-export function buildPiArgs(userArgs: string[]): string[] {
-  const out = ["--mode", "rpc"];
+export function buildPiArgs(userArgs: string[], extensions: string[] = []): string[] {
+  const out = ["--mode", "rpc", ...extensions.flatMap((e) => ["--extension", e])];
   if (!hasFlag(userArgs, "--provider") && !hasFlag(userArgs, "--model")) {
     out.push("--provider", DEFAULT_PROVIDER, "--model", DEFAULT_MODEL);
   }

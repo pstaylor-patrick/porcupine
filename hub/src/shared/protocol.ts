@@ -15,6 +15,7 @@ export const ALLOWED_PI_COMMANDS = [
   "set_model",
   "set_thinking_level",
   "compact",
+  "extension_ui_response",
 ] as const;
 
 export type AllowedPiCommand = (typeof ALLOWED_PI_COMMANDS)[number];
@@ -94,6 +95,12 @@ export interface ErrorFrame {
   message: string;
 }
 export type CliToHubFrame = WelcomeFrame | ResetFrame | EventFrame | ResultFrame | SessionEndedFrame | ErrorFrame;
+
+/** Sent after a forwarded dialog is answered, so every attached browser closes it. */
+export interface PorcupineUiResolved {
+  type: "porcupine_ui_resolved";
+  id: string;
+}
 
 export interface PorcupineNotice {
   type: "porcupine_notice";

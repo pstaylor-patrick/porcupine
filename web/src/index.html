@@ -41,6 +41,7 @@
         <div id="transcript" class="transcript" aria-label="Transcript"></div>
         <p id="empty" class="empty">No session attached. Start one in a tmux pane with <code>porcupine</code>.</p>
       </main>
+      <button id="dialog-reopen" type="button" class="dialog-reopen" hidden>pi is waiting for your answer</button>
       <form id="composer" class="composer" autocomplete="off">
         <div id="attachments" class="attachments" hidden></div>
         <label class="visually-hidden" for="input">Message</label>
@@ -51,6 +52,13 @@
       <div id="run-status" class="visually-hidden" role="status" aria-live="polite"></div>
     </div>
     <div id="scrim" class="scrim" hidden></div>
+    <section id="dialog" class="sheet" role="dialog" aria-modal="true" aria-labelledby="dialog-title" data-open="false">
+      <div class="sheet-head">
+        <h2 id="dialog-title" class="sheet-title">Question</h2>
+        <button id="dialog-close" type="button" class="icon-button" aria-label="Hide question">&#x2715;</button>
+      </div>
+      <div id="dialog-body" class="sheet-body"></div>
+    </section>
     <section id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" data-open="false">
       <div class="sheet-head">
         <h2 id="sheet-title" class="sheet-title">Session settings</h2>
