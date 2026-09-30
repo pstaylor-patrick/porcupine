@@ -5,12 +5,18 @@ import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./tr
 import {
   CAPABILITIES,
   CHEAP_INPUT_MAX,
+  duplicateIds,
   filterModels,
   LONG_CONTEXT_MIN,
   groupByVendor,
   loadRecent,
   parseModel,
+  providerLabel,
+  providersOf,
+  providerTitle,
   pushRecent,
+  recentKey,
+  resolveRecent,
   rowDetail,
   sheetState,
   vendorOf,
@@ -107,6 +113,8 @@ export class App {
   private readonly returnFocus = new Map<Overlay, HTMLElement | null>();
   /** Selected capability chips; memory only, kept across sheet open and close. */
   private readonly caps = new Set<Capability>();
+  /** Selected provider chips; memory only, pruned when a provider leaves the list. */
+  private readonly providers = new Set<string>();
   private modelsRequest: Promise<void> | null = null;
   /** Session the in-flight model request was sent for; a response for another session is dropped. */
   private modelsFor: string | null = null;
@@ -495,7 +503,7 @@ export class App {
     const r = await this.conn.command({ type: "set_model", provider: m.provider, modelId: m.id });
     if (r.success) {
       this.model = parseModel(r.data) ?? m;
-      pushRecent(recentStorage(), this.model.id);
+      pushRecent(recentStorage(), recentKey(this.model), this.models, this.model.provider);
     } else this.notice("error", `set model: ${r.error ?? "failed"}`);
     this.renderHeader();
     this.renderModels();
@@ -571,19 +579,20 @@ export class App {
       models: this.models,
     });
     const q = ($("model-filter") as HTMLInputElement).value.trim();
-    const filtering = q !== "" || this.caps.size > 0;
-    const shown = state === "ready" ? filterModels(this.models, q, this.caps) : [];
+    this.syncProviderChips();
+    const filtering = q !== "" || this.caps.size > 0 || this.providers.size > 0;
+    const shown = state === "ready" ? filterModels(this.models, q, this.caps, this.providers) : [];
+    const dups = duplicateIds(this.models);
     const noMatches = state === "ready" && shown.length === 0;
     status.hidden = state === "ready" && !noMatches;
     status.dataset.state = noMatches ? "no-matches" : state;
     if (state === "error") status.textContent = `Could not load models: ${this.modelsError ?? "failed"}`;
     else if (state !== "ready") status.textContent = SHEET_MESSAGES[state];
-    else status.textContent = noMatches ? (this.caps.size > 0 ? "No models match these filters" : "No matches") : "";
+    else status.textContent = noMatches ? (this.caps.size > 0 || this.providers.size > 0 ? "No models match these filters" : "No matches") : "";
 
-    const byId = new Map(this.models.map((m) => [m.id, m]));
-    const recentModels = filtering || state !== "ready" ? [] : loadRecent(recentStorage()).flatMap((id) => byId.get(id) ?? []);
+    const recentModels = filtering || state !== "ready" ? [] : resolveRecent(loadRecent(recentStorage()), this.models, this.model?.provider);
     recent.hidden = recentModels.length === 0;
-    $("model-recent-list").replaceChildren(...recentModels.map((m) => this.modelOption(m)));
+    $("model-recent-list").replaceChildren(...recentModels.map((m) => this.modelOption(m, dups)));
 
     const currentVendor = this.model ? vendorOf(this.model.id, this.model.provider) : null;
     const grouped = groupByVendor(shown);
@@ -603,7 +612,7 @@ export class App {
         ul.className = "model-list";
         ul.setAttribute("role", "listbox");
         ul.setAttribute("aria-label", g.vendor);
-        ul.append(...g.models.map((m) => this.modelOption(m)));
+        ul.append(...g.models.map((m) => this.modelOption(m, dups)));
         details.append(summary, ul);
         return details;
       }),
@@ -653,6 +662,32 @@ export class App {
     );
   }
 
+  /** Provider toggle chips after the capability chips, only when more than one provider is loaded. */
+  private syncProviderChips(): void {
+    const row = $("model-chips");
+    for (const old of row.querySelectorAll("[data-provider]")) old.remove();
+    const present = providersOf(this.models);
+    for (const p of [...this.providers]) if (!present.includes(p)) this.providers.delete(p);
+    if (present.length < 2) return;
+    row.append(
+      ...present.map((p) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "filter-chip";
+        b.dataset.provider = p;
+        b.textContent = providerLabel(p);
+        b.title = providerTitle(p);
+        b.setAttribute("aria-pressed", this.providers.has(p) ? "true" : "false");
+        b.addEventListener("click", () => {
+          if (this.providers.has(p)) this.providers.delete(p);
+          else this.providers.add(p);
+          this.renderModels();
+        });
+        return b;
+      }),
+    );
+  }
+
   private jumpToVendor(select: HTMLSelectElement): void {
     const vendor = select.value;
     select.value = "";
@@ -665,7 +700,7 @@ export class App {
     details.querySelector("summary")?.focus();
   }
 
-  private modelOption(m: ModelInfo): HTMLLIElement {
+  private modelOption(m: ModelInfo, dups: ReadonlySet<string>): HTMLLIElement {
     const li = document.createElement("li");
     const b = document.createElement("button");
     b.type = "button";
@@ -677,6 +712,13 @@ export class App {
     name.className = "model-option-name";
     name.textContent = m.name ?? m.id;
     b.append(name);
+    if (dups.has(m.id)) {
+      const badge = document.createElement("span");
+      badge.className = "provider-badge";
+      badge.textContent = providerLabel(m.provider);
+      b.append(badge);
+      b.setAttribute("aria-label", `${m.name ?? m.id}, ${providerTitle(m.provider)}`);
+    }
     const detail = rowDetail(m);
     if (detail) {
       const d = document.createElement("span");

@@ -230,6 +230,7 @@ select {
 .model-option { display: flex; flex-direction: column; justify-content: center; gap: 2px; width: 100%; min-height: 44px; text-align: left; background: none; border: 0; padding: 8px 10px; overflow-wrap: anywhere; cursor: pointer; }
 .model-option-name { overflow-wrap: anywhere; }
 .model-option-detail { font-size: 0.8125rem; font-weight: 400; color: color-mix(in srgb, var(--fg) 65%, var(--bg)); }
+.provider-badge { align-self: flex-start; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg); background: var(--user); border-radius: 999px; padding: 2px 8px; }
 .model-option:hover, .model-option:focus-visible { background: var(--code); }
 .model-option:focus-visible { outline-offset: -2px; }
 .model-option[aria-selected="true"] { font-weight: 700; color: var(--fg); }

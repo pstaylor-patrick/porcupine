@@ -451,6 +451,75 @@ describe("app", () => {
     localStorage.clear();
   });
 
+  it("badges duplicated ids, filters by provider chips and keys recents by provider", async () => {
+    localStorage.clear();
+    localStorage.setItem("porcupine.recentModels", JSON.stringify(["vercel-ai-gateway|anthropic/claude-opus-5.5"]));
+    const two = {
+      success: true,
+      data: {
+        models: [
+          { provider: "openrouter", id: "anthropic/claude-opus-5.5", reasoning: true },
+          { provider: "vercel-ai-gateway", id: "anthropic/claude-opus-5.5", reasoning: true },
+          { provider: "vercel-ai-gateway", id: "openai/gpt-5" },
+          { provider: "openrouter", id: "zai/glm-5" },
+        ],
+      },
+    };
+    const { app, conn, sent } = setup({ get_available_models: two });
+    conn.sessionId = "s1";
+    app.openSheet();
+    await vi.waitFor(() => expect(document.querySelectorAll("#model-groups details")).toHaveLength(3));
+    const rows = () =>
+      [...document.querySelectorAll<HTMLButtonElement>("#model-groups .model-option")].map((b) => [
+        b.querySelector(".model-option-name")?.textContent,
+        b.querySelector(".provider-badge")?.textContent ?? null,
+      ]);
+    expect(rows()).toEqual([
+      ["anthropic/claude-opus-5.5", "OpenRouter"],
+      ["anthropic/claude-opus-5.5", "Vercel"],
+      ["openai/gpt-5", null],
+      ["zai/glm-5", null],
+    ]);
+    const orRow = document.querySelectorAll<HTMLButtonElement>("#model-groups .model-option")[0]!;
+    expect(orRow.getAttribute("aria-label")).toBe("anthropic/claude-opus-5.5, OpenRouter");
+    expect(document.querySelector("#model-recent .provider-badge")?.textContent).toBe("Vercel");
+
+    const pchip = (p: string) => document.querySelector<HTMLButtonElement>(`#model-chips [data-provider="${p}"]`);
+    expect(pchip("openrouter")?.textContent).toBe("OpenRouter");
+    expect(pchip("vercel-ai-gateway")?.title).toBe("Vercel AI Gateway");
+    pchip("vercel-ai-gateway")!.click();
+    expect(pchip("vercel-ai-gateway")?.getAttribute("aria-pressed")).toBe("true");
+    expect(rows()).toEqual([
+      ["anthropic/claude-opus-5.5", "Vercel"],
+      ["openai/gpt-5", null],
+    ]);
+    pchip("vercel-ai-gateway")!.click();
+    expect(rows()).toHaveLength(4);
+
+    document.querySelectorAll<HTMLButtonElement>("#model-groups .model-option")[0]!.click();
+    await vi.waitFor(() => expect(sent).toContainEqual({ type: "set_model", provider: "openrouter", modelId: "anthropic/claude-opus-5.5" }));
+    await vi.waitFor(() =>
+      expect([...document.querySelectorAll("#model-recent .provider-badge")].map((b) => b.textContent)).toEqual(["OpenRouter", "Vercel"]),
+    );
+    expect(JSON.parse(localStorage.getItem("porcupine.recentModels")!)).toEqual([
+      "openrouter|anthropic/claude-opus-5.5",
+      "vercel-ai-gateway|anthropic/claude-opus-5.5",
+    ]);
+    localStorage.clear();
+  });
+
+  it("shows no provider chips with one provider", async () => {
+    const { app, conn } = setup({
+      get_available_models: { success: true, data: { models: [{ provider: "openrouter", id: "a/b" }, { provider: "openrouter", id: "c/d" }] } },
+    });
+    conn.sessionId = "s1";
+    app.openSheet();
+    await vi.waitFor(() => expect(document.querySelectorAll("#model-groups details")).toHaveLength(2));
+    expect(document.querySelectorAll("#model-chips [data-provider]")).toHaveLength(0);
+    expect(document.querySelectorAll("#model-chips .filter-chip")).toHaveLength(4);
+    expect(document.querySelectorAll(".provider-badge")).toHaveLength(0);
+  });
+
   it("shows distinct model sheet states", async () => {
     const { app, conn } = setup({ get_available_models: { success: true, data: { models: [] } } });
     app.openSheet();

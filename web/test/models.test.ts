@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   CAPABILITIES,
   CHEAP_INPUT_MAX,
+  duplicateIds,
   filterModels,
+  migrateRecent,
+  providerLabel,
+  providerTitle,
+  recentKey,
+  resolveRecent,
   hasCapability,
   LONG_CONTEXT_MIN,
   formatContext,
@@ -245,5 +251,53 @@ describe("capability filters", () => {
   it("returns the same array for empty query and empty set", () => {
     expect(filterModels(all, "")).toBe(all);
     expect(filterModels(all, "  ", new Set())).toBe(all);
+  });
+});
+
+describe("providers", () => {
+  const OR = "openrouter";
+  const VG = "vercel-ai-gateway";
+  const models: ModelInfo[] = [
+    { provider: OR, id: "anthropic/claude-opus-5.5", reasoning: true },
+    { provider: VG, id: "anthropic/claude-opus-5.5", reasoning: true },
+    { provider: VG, id: "openai/gpt-5", reasoning: false },
+    { provider: OR, id: "zai/glm-5", reasoning: true },
+  ];
+  const ids = (ms: ModelInfo[]) => ms.map((m) => `${m.provider}|${m.id}`);
+
+  it("finds ids served by more than one provider", () => {
+    expect([...duplicateIds(models)]).toEqual(["anthropic/claude-opus-5.5"]);
+    expect(duplicateIds([models[0]!, models[0]!]).size).toBe(0);
+  });
+
+  it("labels known providers and falls back to the raw id", () => {
+    expect(providerLabel(OR)).toBe("OpenRouter");
+    expect(providerLabel(VG)).toBe("Vercel");
+    expect(providerTitle(VG)).toBe("Vercel AI Gateway");
+    expect(providerLabel("acme")).toBe("acme");
+    expect(providerTitle("acme")).toBe("acme");
+  });
+
+  it("filters by provider, OR among providers and AND with capabilities and text", () => {
+    expect(filterModels(models, "", new Set(), new Set())).toBe(models);
+    expect(ids(filterModels(models, "", new Set(), new Set([VG])))).toEqual([`${VG}|anthropic/claude-opus-5.5`, `${VG}|openai/gpt-5`]);
+    expect(filterModels(models, "", new Set(), new Set([VG, OR]))).toHaveLength(4);
+    expect(ids(filterModels(models, "", new Set<Capability>(["thinking"]), new Set([VG])))).toEqual([`${VG}|anthropic/claude-opus-5.5`]);
+    expect(ids(filterModels(models, "glm", new Set(), new Set([OR, VG])))).toEqual([`${OR}|zai/glm-5`]);
+    expect(filterModels(models, "glm", new Set(), new Set([VG]))).toEqual([]);
+  });
+
+  it("migrates id-only recents to provider|id, preferring the current provider, and dedupes", () => {
+    expect(recentKey(models[1]!)).toBe(`${VG}|anthropic/claude-opus-5.5`);
+    const old = ["anthropic/claude-opus-5.5", `${OR}|zai/glm-5`, "gone/x"];
+    expect(ids(resolveRecent(old, models, VG))).toEqual([`${VG}|anthropic/claude-opus-5.5`, `${OR}|zai/glm-5`]);
+    expect(ids(resolveRecent(old, models))).toEqual([`${OR}|anthropic/claude-opus-5.5`, `${OR}|zai/glm-5`]);
+    expect(ids(resolveRecent([`${OR}|zai/glm-5`, "zai/glm-5"], models))).toEqual([`${OR}|zai/glm-5`]);
+    expect(migrateRecent(old, models, VG)).toEqual([`${VG}|anthropic/claude-opus-5.5`, `${OR}|zai/glm-5`, "gone/x"]);
+    expect(migrateRecent([`${OR}|zai/glm-5`, "zai/glm-5"], models)).toEqual([`${OR}|zai/glm-5`]);
+
+    const s = memStorage();
+    s.data.set(RECENT_KEY, JSON.stringify(["anthropic/claude-opus-5.5", "zai/glm-5"]));
+    expect(pushRecent(s, `${OR}|zai/glm-5`, models, OR)).toEqual([`${OR}|zai/glm-5`, `${OR}|anthropic/claude-opus-5.5`]);
   });
 });

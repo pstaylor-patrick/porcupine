@@ -72,12 +72,18 @@ export function hasCapability(m: ModelInfo, c: Capability): boolean {
   }
 }
 
-/** Keeps models that have every selected capability and match every query term. */
-export function filterModels(models: ModelInfo[], query: string, caps: ReadonlySet<Capability> = new Set()): ModelInfo[] {
+/** Keeps models that have every selected capability, match every query term and sit under any selected provider. */
+export function filterModels(
+  models: ModelInfo[],
+  query: string,
+  caps: ReadonlySet<Capability> = new Set(),
+  providers: ReadonlySet<string> = new Set(),
+): ModelInfo[] {
   const q = query.trim().toLowerCase();
-  if (!q && caps.size === 0) return models;
+  if (!q && caps.size === 0 && providers.size === 0) return models;
   const terms = q ? q.split(/\s+/) : [];
   return models.filter((m) => {
+    if (providers.size > 0 && !providers.has(m.provider)) return false;
     for (const c of caps) if (!hasCapability(m, c)) return false;
     if (terms.length === 0) return true;
     const words = [`${m.provider}/${m.id}`, m.name ?? ""];
@@ -86,6 +92,38 @@ export function filterModels(models: ModelInfo[], query: string, caps: ReadonlyS
     const hay = words.join(" ").toLowerCase();
     return terms.every((t) => hay.includes(t));
   });
+}
+
+const PROVIDER_LABELS: Readonly<Record<string, { label: string; title: string }>> = {
+  openrouter: { label: "OpenRouter", title: "OpenRouter" },
+  "vercel-ai-gateway": { label: "Vercel", title: "Vercel AI Gateway" },
+};
+
+/** Terse provider label for badges and chips; unknown providers fall back to the raw id. */
+export function providerLabel(provider: string): string {
+  return PROVIDER_LABELS[provider]?.label ?? provider;
+}
+
+/** Full provider name for titles; unknown providers fall back to the raw id. */
+export function providerTitle(provider: string): string {
+  return PROVIDER_LABELS[provider]?.title ?? provider;
+}
+
+/** Distinct providers in list order. */
+export function providersOf(models: readonly ModelInfo[]): string[] {
+  return [...new Set(models.map((m) => m.provider))];
+}
+
+/** Ids served by more than one provider in this list. */
+export function duplicateIds(models: readonly ModelInfo[]): Set<string> {
+  const seen = new Map<string, string>();
+  const dup = new Set<string>();
+  for (const m of models) {
+    const p = seen.get(m.id);
+    if (p === undefined) seen.set(m.id, m.provider);
+    else if (p !== m.provider) dup.add(m.id);
+  }
+  return dup;
 }
 
 export type SheetState = "detached" | "loading" | "error" | "empty" | "ready";
@@ -173,9 +211,56 @@ export function loadRecent(storage: RecentStorage | null | undefined): string[] 
   }
 }
 
+/** Recents key: provider, "|", id. Model ids contain "/", provider ids never contain "|". */
+export function recentKey(m: Pick<ModelInfo, "provider" | "id">): string {
+  return `${m.provider}|${m.id}`;
+}
+
+function findRecent(key: string, models: readonly ModelInfo[], currentProvider: string | undefined): ModelInfo | undefined {
+  const bar = key.indexOf("|");
+  if (bar >= 0) {
+    const provider = key.slice(0, bar);
+    const id = key.slice(bar + 1);
+    return models.find((m) => m.provider === provider && m.id === id);
+  }
+  // Old id-only entry: prefer the current provider, else the first model with that id.
+  return models.find((m) => m.id === key && m.provider === currentProvider) ?? models.find((m) => m.id === key);
+}
+
+/** Resolves stored keys, old id-only or provider|id, to models; unknown keys are dropped and duplicates removed. */
+export function resolveRecent(keys: readonly string[], models: readonly ModelInfo[], currentProvider?: string): ModelInfo[] {
+  const seen = new Set<string>();
+  const out: ModelInfo[] = [];
+  for (const k of keys) {
+    const m = findRecent(k, models, currentProvider);
+    if (!m) continue;
+    const nk = recentKey(m);
+    if (seen.has(nk)) continue;
+    seen.add(nk);
+    out.push(m);
+  }
+  return out;
+}
+
+/** Rewrites old id-only keys that resolve against `models` in provider|id form and dedupes; unresolved keys are kept as they are. */
+export function migrateRecent(keys: readonly string[], models: readonly ModelInfo[], currentProvider?: string): string[] {
+  const out = keys.map((k) => {
+    if (k.includes("|")) return k;
+    const m = findRecent(k, models, currentProvider);
+    return m ? recentKey(m) : k;
+  });
+  return [...new Set(out)];
+}
+
 /** Moves `key` to the front, dedupes, caps at RECENT_MAX and saves; storage errors are ignored. */
-export function pushRecent(storage: RecentStorage | null | undefined, key: string): string[] {
-  const next = [key, ...loadRecent(storage).filter((k) => k !== key)].slice(0, RECENT_MAX);
+export function pushRecent(
+  storage: RecentStorage | null | undefined,
+  key: string,
+  models: readonly ModelInfo[] = [],
+  currentProvider?: string,
+): string[] {
+  const prev = migrateRecent(loadRecent(storage), models, currentProvider);
+  const next = [key, ...prev.filter((k) => k !== key)].slice(0, RECENT_MAX);
   try {
     storage?.setItem(RECENT_KEY, JSON.stringify(next));
   } catch {
