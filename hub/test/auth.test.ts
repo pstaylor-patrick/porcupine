@@ -65,8 +65,12 @@ describe("LoginRateLimiter", () => {
 describe("clientIp", () => {
   const req = (peer: string, xff?: string): IncomingMessage =>
     ({ socket: { remoteAddress: peer }, headers: xff ? { "x-forwarded-for": xff } : {} }) as unknown as IncomingMessage;
-  it("trusts X-Forwarded-For only from loopback", () => {
+  it("trusts X-Forwarded-For only from loopback and Docker bridge peers", () => {
     expect(clientIp(req("127.0.0.1", "100.1.2.3"))).toBe("100.1.2.3");
+    expect(clientIp(req("::ffff:172.18.0.5", "100.1.2.3"))).toBe("100.1.2.3");
+    expect(clientIp(req("172.31.255.1", "100.1.2.3"))).toBe("100.1.2.3");
     expect(clientIp(req("100.9.9.9", "1.2.3.4"))).toBe("100.9.9.9");
+    expect(clientIp(req("172.32.0.1", "1.2.3.4"))).toBe("172.32.0.1");
+    expect(clientIp(req("172.15.0.1", "1.2.3.4"))).toBe("172.15.0.1");
   });
 });

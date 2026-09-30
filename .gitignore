@@ -4,5 +4,3 @@ dist/
 *.tfstate*
 .terraform/
 tfplan
-caddy/data/
-caddy/config/
