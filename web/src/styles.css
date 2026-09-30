@@ -211,7 +211,14 @@ select {
 }
 .msg.assistant { display: flex; flex-direction: column; gap: 8px; }
 .prose { white-space: pre-wrap; }
-.prose code { background: var(--code); padding: 1px 4px; border-radius: 4px; }
+.prose code, .md-list code, .md-heading code { background: var(--code); padding: 1px 4px; border-radius: 4px; }
+.msg.assistant p, .md-list, .md-heading, .msg.assistant blockquote { margin: 0; }
+.msg.assistant .prose { white-space: normal; }
+.md-list { padding-left: 1.4em; display: flex; flex-direction: column; gap: 4px; }
+.md-heading { font-size: 1.05em; }
+.msg.assistant blockquote { border-left: 3px solid var(--line); padding-left: 10px; color: var(--muted); }
+.msg.assistant hr { border: 0; border-top: 1px solid var(--line); width: 100%; }
+.msg.assistant a { color: var(--accent); }
 pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 pre.code { background: var(--code); padding: 10px 12px; border-radius: 8px; white-space: pre; overflow-x: auto; }
 
