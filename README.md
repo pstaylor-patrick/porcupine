@@ -87,7 +87,7 @@ tmux new-session -s myrepo -c ~/code/myrepo 'porcupine --name myrepo'
 
 It appears in the app's sidebar. Without `--name` the name is the tmux
 `session:window`, else the folder name. Arguments after `--` go to pi, e.g.
-`porcupine --name x -- --model anthropic/claude-sonnet-5.5 --thinking high`.
+`porcupine --name x -- --thinking high`.
 Each pane logs the model it starts on, and the app shows the current model in
 settings. Ctrl-C in the pane ends the session; a reboot clears them all.
 
