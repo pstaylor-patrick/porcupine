@@ -11,7 +11,7 @@ You need Node 22 or newer, tmux and Ruby (for the installer).
 git clone https://github.com/pstaylor-patrick/porcupine.git
 cd porcupine
 npm ci
-cp .env.example .env   # fill in your values; .env is gitignored
+mkdir -p ~/.config/porcupine && cp .env.example ~/.config/porcupine/.env   # fill in your values
 ruby install.rb        # among other things, enables the pre-commit hook
 ```
 
