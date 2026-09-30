@@ -415,7 +415,7 @@ details > :not(summary) { padding: 0 12px 10px; }
 .main:has(> .empty[hidden]) > .transcript:empty { min-height: 100%; }
 .crayon { pointer-events: none; fill: none; stroke: var(--crayon); stroke-linecap: round; stroke-linejoin: round; }
 .crayon-scribble { display: none; position: absolute; inset: 0; width: 100%; height: 100%; stroke-width: 3; }
-@media (max-width: 360px) { @media (prefers-reduced-motion: no-preference) {
+@media (prefers-reduced-motion: no-preference) {
   .empty.scribble:has(> .crayon-scribble) { background-image: var(--scene-moon), var(--scene-horizon); }
   .crayon-scribble { display: block; }
   .crayon-scribble path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: crayon-draw 1.4s ease-out forwards; }
