@@ -1,4 +1,5 @@
 /** DOM rendering. Model output only ever reaches the DOM through textContent / text nodes. */
+import { renderMarkdown } from "./markdown.js";
 import type { Item, ToolState, Transcript } from "./transcript.js";
 
 export const ARGS_LIMIT = 2048;
@@ -100,7 +101,7 @@ export function renderItem(item: Item, t: Transcript, open: Set<string>): HTMLEl
       item.blocks.forEach((b, i) => {
         if (!b) return;
         if (b.type === "text") {
-          if (b.text) art.append(formatText(b.text));
+          if (b.text) art.append(renderMarkdown(b.text));
         } else if (b.type === "thinking") {
           if (!b.text) return;
           const id = `think:${item.key}:${i}`;
