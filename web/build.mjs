@@ -42,11 +42,12 @@ writeFileSync("dist/index.html", html);
 
 cpSync("src/login.html", "dist/login.html");
 cpSync("src/login.css", "dist/login.css");
+cpSync("src/theme-init.js", "dist/theme-init.js");
 cpSync("src/manifest.webmanifest", "dist/manifest.webmanifest");
 for (const f of ["icon-192.png", "icon-512.png", "maskable-512.png"]) copyFileSync(`src/icons/${f}`, `dist/icons/${f}`);
 copyFileSync("src/icons/apple-touch-icon-180.png", "dist/apple-touch-icon.png");
 
-const shell = ["/", `/${jsName}`, `/${cssName}`, "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/apple-touch-icon.png"];
+const shell = ["/", `/${jsName}`, `/${cssName}`, "/theme-init.js", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/apple-touch-icon.png"];
 await build({
   entryPoints: ["src/sw.ts"],
   bundle: true,

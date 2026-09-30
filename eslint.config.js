@@ -6,5 +6,6 @@ export default tseslint.config(
   { ignores: ["**/dist/**", "**/node_modules/**", "infra/.terraform/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  { files: ["web/src/**/*.js"], languageOptions: { globals: globals.browser } },
   { files: ["web/**/*.mjs", "scripts/**/*.mjs"], languageOptions: { globals: globals.node } },
 );

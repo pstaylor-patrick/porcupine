@@ -14,3 +14,6 @@ button { font: inherit; padding: 12px; border-radius: 10px; border: 0; backgroun
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .error { display: none; color: var(--fg); font-weight: 600; }
 .error:target { display: block; }
+
+.theme-toggle { position: fixed; top: calc(env(safe-area-inset-top) + 12px); right: calc(env(safe-area-inset-right) + 12px); display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
+.theme-toggle svg[hidden] { display: none; }

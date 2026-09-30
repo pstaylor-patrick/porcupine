@@ -27,6 +27,7 @@ export function isPublicPath(path: string): boolean {
   return (
     path === "/login" ||
     path === "/login.css" ||
+    path === "/theme-init.js" ||
     path === "/sw.js" ||
     path === "/manifest.webmanifest" ||
     path === "/apple-touch-icon.png" ||

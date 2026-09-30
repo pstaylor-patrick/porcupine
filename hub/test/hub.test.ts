@@ -9,6 +9,7 @@ import { startSession, type Session } from "../src/cli/session.js";
 import { COOKIE_NAME, signCookie } from "../src/server/auth.js";
 import type { HubConfig } from "../src/server/config.js";
 import { createHub, type Hub } from "../src/server/hub.js";
+import { isPublicPath } from "../src/server/static.js";
 
 const FAKE_PI = fileURLToPath(new URL("./fixtures/fake-pi.mjs", import.meta.url));
 const ORIGIN = "https://porcupine.example.com";
@@ -149,6 +150,13 @@ describe("hub HTTP and auth", () => {
     const app = await fetch(`${base}/`, { headers: { Cookie: cookie() } });
     expect(await app.text()).toContain("<title>app</title>");
     expect(app.headers.get("cache-control")).toBe("no-cache");
+  });
+
+  it("serves /theme-init.js without a cookie", async () => {
+    expect(isPublicPath("/theme-init.js")).toBe(true);
+    const r = await fetch(`${base}/theme-init.js`, { redirect: "manual" });
+    expect(r.status).not.toBe(303);
+    expect(r.status).not.toBe(401);
   });
 
   it("rejects a tampered cookie", async () => {
