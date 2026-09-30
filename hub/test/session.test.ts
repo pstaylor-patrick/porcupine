@@ -60,7 +60,7 @@ async function start(extraEnv: Record<string, string> = {}, userArgs: string[] =
     cwd: dir,
     piBin: FAKE_PI,
     piArgs: buildPiArgs(userArgs),
-    childEnv: buildChildEnv({ ...process.env, ...extraEnv }, { VERCEL_AI_GATEWAY_API_KEY: "vk", PORCUPINE_RPC_PASSWORD: "hunter2" }),
+    childEnv: buildChildEnv({ ...process.env, ...extraEnv }, { VERCEL_AI_GATEWAY_API_KEY: "vk", OPENROUTER_API_KEY: "sk-or-test", PORCUPINE_RPC_PASSWORD: "hunter2" }),
     runtimeDir: join(dir, "run"),
     log: (l) => logs.push(l),
     stdinGraceMs: 500,
@@ -86,7 +86,7 @@ describe("porcupine session", () => {
       name: "My Test",
       cwd: dir,
       piVersion: "0.99.1",
-      provider: "vercel-ai-gateway",
+      provider: "openrouter",
       model: "anthropic/claude-sonnet-5.5",
     });
     expect(meta.piPid).toBeGreaterThan(0);
@@ -100,9 +100,11 @@ describe("porcupine session", () => {
     const envFile = join(tmpdir(), `fake-env-${process.pid}.json`);
     await start({ FAKE_PI_ARGS_FILE: argsFile, FAKE_PI_ENV_FILE: envFile, PORCUPINE_RPC_PASSWORD: "hunter2" });
     const args = JSON.parse(readFileSync(argsFile, "utf8"));
-    expect(args).toEqual(["--mode", "rpc", "--provider", "vercel-ai-gateway", "--model", "anthropic/claude-opus-5.5", "--thinking", "low"]);
+    expect(args).toEqual(["--mode", "rpc", "--provider", "openrouter", "--model", "anthropic/claude-opus-5.5", "--thinking", "low"]);
     const env = JSON.parse(readFileSync(envFile, "utf8")) as Record<string, string>;
-    expect(env.AI_GATEWAY_API_KEY).toBe("vk");
+    expect(env.OPENROUTER_API_KEY).toBe("sk-or-test");
+    expect(env.AI_GATEWAY_API_KEY).toBeUndefined();
+    expect(JSON.stringify(env)).not.toContain('"vk"');
     expect(env.PORCUPINE_RPC_PASSWORD).toBeUndefined();
     expect(JSON.stringify(env)).not.toContain("hunter2");
     rmSync(argsFile, { force: true });
@@ -127,6 +129,30 @@ describe("porcupine session", () => {
     expect(b.t === "result" && b.response).toMatchObject({ success: true, command: "get_messages" });
     expect(cc.t === "result" && cc.response).toEqual({ success: false, error: "command not allowed" });
     expect(d.t === "result" && d.response).toEqual({ success: false, error: "command not allowed" });
+    c.close();
+  });
+
+  it("filters the model list and rejects unrouted set_model", async () => {
+    const s = await start({ ANTHROPIC_API_KEY: "", OPENAI_API_KEY: "" });
+    const c = await Client.open(s.paths.sock);
+    c.send({ t: "hello", proto: 1, since: null });
+    await c.until((f) => f.t === "welcome");
+    c.send({ t: "cmd", cid: "m", cmd: { type: "get_available_models" } });
+    c.send({ t: "cmd", cid: "v", cmd: { type: "set_model", provider: "vercel-ai-gateway", modelId: "anthropic/claude-opus-5.5" } });
+    c.send({ t: "cmd", cid: "k", cmd: { type: "set_model", provider: "openrouter", modelId: "moonshotai/kimi-k3" } });
+    const m = await c.until((f) => f.t === "result" && f.cid === "m");
+    const v = await c.until((f) => f.t === "result" && f.cid === "v");
+    const k = await c.until((f) => f.t === "result" && f.cid === "k");
+    expect(m.t === "result" && (m.response.data as { models: unknown[] }).models).toEqual([
+      { provider: "openrouter", id: "anthropic/claude-opus-5.5" },
+      { provider: "openrouter", id: "moonshotai/kimi-k3" },
+    ]);
+    expect(v.t === "result" && v.response).toEqual({
+      success: false,
+      error: "model not available: vercel-ai-gateway/anthropic/claude-opus-5.5",
+    });
+    expect(k.t === "result" && k.response.success).toBe(true);
+    expect(s.meta).toMatchObject({ provider: "openrouter", model: "moonshotai/kimi-k3" });
     c.close();
   });
 

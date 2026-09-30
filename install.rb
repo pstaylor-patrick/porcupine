@@ -16,7 +16,7 @@ ROOT = __dir__
 BIN_DIR = File.join(Dir.home, ".local", "bin")
 ENV_FILE = ENV.fetch("PORCUPINE_ENV_FILE") { File.join(ENV.fetch("XDG_CONFIG_HOME", File.join(Dir.home, ".config")), "porcupine", ".env") }
 REQUIRED_KEYS = %w[PORCUPINE_ORIGIN PORCUPINE_RPC_PASSWORD PORCUPINE_COOKIE_SECRET].freeze
-PROVIDER_KEYS = %w[OPENROUTER_API_KEY VERCEL_AI_GATEWAY_API_KEY].freeze
+PROVIDER_KEYS = %w[OPENROUTER_API_KEY ANTHROPIC_API_KEY OPENAI_API_KEY].freeze
 LINKS = {
   "porcupine" => "hub/dist/cli/main.js",
   "porcupine-hub" => "hub/dist/server/main.js"
@@ -74,11 +74,8 @@ def check_secrets
     keys.include?(k) ? puts("    #{k}: set") : warn_line("#{k} is not set")
   end
   providers = PROVIDER_KEYS.select { |k| keys.include?(k) }
-  if providers.empty?
-    warn_line "no provider key set; set one of #{PROVIDER_KEYS.join(', ')}"
-  else
-    puts("    provider keys set: #{providers.join(', ')}")
-  end
+  puts("    provider keys set: #{providers.empty? ? 'none' : providers.join(', ')}")
+  warn_line "OPENROUTER_API_KEY is not set; it serves every model not routed direct" unless keys.include?("OPENROUTER_API_KEY")
 end
 
 def enable_hooks

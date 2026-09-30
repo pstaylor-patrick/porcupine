@@ -1,16 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { basename } from "node:path";
 
-/** Fallback provider when no override and no OpenRouter key is present. */
-export const DEFAULT_PROVIDER = "vercel-ai-gateway";
-export const DEFAULT_MODEL = "anthropic/claude-opus-5.5";
-export const DEFAULT_THINKING = "low";
+import { routeProvider, vendorOfId } from "./routing.js";
 
-/** Providers porcupine knows how to key, with display labels. */
-export const PROVIDERS: Readonly<Record<string, string>> = {
-  openrouter: "OpenRouter",
-  "vercel-ai-gateway": "Vercel AI Gateway",
-};
+/** Default model on OpenRouter, and the same model on the Anthropic API when keyed. */
+export const DEFAULT_PROVIDER = "openrouter";
+export const DEFAULT_MODEL = "anthropic/claude-opus-5.5";
+export const DIRECT_ANTHROPIC_MODEL = "claude-opus-5-5";
+export const DEFAULT_THINKING = "low";
 
 const OPENROUTER_KEY_PREFIX = "sk-or-";
 
@@ -55,15 +52,19 @@ function hasFlag(args: string[], flag: string): boolean {
   return args.some((a) => a === flag || a.startsWith(`${flag}=`));
 }
 
-/** Provider from the child env: PORCUPINE_PROVIDER, else openrouter when keyed, else vercel-ai-gateway. */
-export function resolveDefaultProvider(env: NodeJS.ProcessEnv): string {
-  if (env.PORCUPINE_PROVIDER) return env.PORCUPINE_PROVIDER;
-  if (env.OPENROUTER_API_KEY) return "openrouter";
-  return DEFAULT_PROVIDER;
-}
-
+/**
+ * Default model from the child env. PORCUPINE_MODEL is an OpenRouter-style "vendor/model" id,
+ * routed like any other; a directly served vendor gets the id without its prefix.
+ */
 export function resolveDefaults(env: NodeJS.ProcessEnv): PiDefaults {
-  return { provider: resolveDefaultProvider(env), model: env.PORCUPINE_MODEL || DEFAULT_MODEL };
+  if (env.PORCUPINE_MODEL) {
+    const vendor = vendorOfId(env.PORCUPINE_MODEL);
+    const provider = routeProvider(vendor, env);
+    const model = provider === "openrouter" ? env.PORCUPINE_MODEL : env.PORCUPINE_MODEL.slice(vendor.length + 1);
+    return { provider, model };
+  }
+  if (routeProvider("anthropic", env) === "anthropic") return { provider: "anthropic", model: DIRECT_ANTHROPIC_MODEL };
+  return { provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL };
 }
 
 export function buildPiArgs(
@@ -79,17 +80,29 @@ export function buildPiArgs(
   return [...out, ...userArgs];
 }
 
+/** Provider keys passed from the env file to pi; a key already in the process env wins. */
+const PROVIDER_KEYS = ["OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"] as const;
+
+/** Keys pi would use for providers porcupine does not route to. */
+const UNUSED_KEYS = ["AI_GATEWAY_API_KEY"] as const;
+
 /** Child env: process env plus provider keys from the env file, minus porcupine secrets. */
 export function buildChildEnv(processEnv: NodeJS.ProcessEnv, fileEnv: Record<string, string>): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...processEnv };
-  const key = fileEnv.VERCEL_AI_GATEWAY_API_KEY ?? processEnv.VERCEL_AI_GATEWAY_API_KEY;
-  if (!env.AI_GATEWAY_API_KEY && key) env.AI_GATEWAY_API_KEY = key;
-  const orKey = fileEnv.OPENROUTER_API_KEY ?? processEnv.OPENROUTER_API_KEY;
-  if (!env.OPENROUTER_API_KEY && orKey) env.OPENROUTER_API_KEY = orKey;
+  for (const k of PROVIDER_KEYS) {
+    const v = fileEnv[k];
+    if (!env[k] && v) env[k] = v;
+  }
+  for (const k of UNUSED_KEYS) delete env[k];
   // An OpenRouter key under OPENAI_API_KEY would be sent to OpenAI by pi: move it, never pass it on.
-  const openaiKey = fileEnv.OPENAI_API_KEY ?? env.OPENAI_API_KEY;
-  if (openaiKey?.startsWith(OPENROUTER_KEY_PREFIX) && !env.OPENROUTER_API_KEY) env.OPENROUTER_API_KEY = openaiKey;
-  if (env.OPENAI_API_KEY?.startsWith(OPENROUTER_KEY_PREFIX)) delete env.OPENAI_API_KEY;
+  for (const v of [env.OPENAI_API_KEY, fileEnv.OPENAI_API_KEY]) {
+    if (v?.startsWith(OPENROUTER_KEY_PREFIX) && !env.OPENROUTER_API_KEY) env.OPENROUTER_API_KEY = v;
+  }
+  if (env.OPENAI_API_KEY?.startsWith(OPENROUTER_KEY_PREFIX)) {
+    const fileKey = fileEnv.OPENAI_API_KEY;
+    if (fileKey && !fileKey.startsWith(OPENROUTER_KEY_PREFIX)) env.OPENAI_API_KEY = fileKey;
+    else delete env.OPENAI_API_KEY;
+  }
   for (const k of SECRET_KEYS) delete env[k];
   return env;
 }

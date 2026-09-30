@@ -72,18 +72,12 @@ export function hasCapability(m: ModelInfo, c: Capability): boolean {
   }
 }
 
-/** Keeps models that have every selected capability, match every query term and sit under any selected provider. */
-export function filterModels(
-  models: ModelInfo[],
-  query: string,
-  caps: ReadonlySet<Capability> = new Set(),
-  providers: ReadonlySet<string> = new Set(),
-): ModelInfo[] {
+/** Keeps models that have every selected capability and match every query term. */
+export function filterModels(models: ModelInfo[], query: string, caps: ReadonlySet<Capability> = new Set()): ModelInfo[] {
   const q = query.trim().toLowerCase();
-  if (!q && caps.size === 0 && providers.size === 0) return models;
+  if (!q && caps.size === 0) return models;
   const terms = q ? q.split(/\s+/) : [];
   return models.filter((m) => {
-    if (providers.size > 0 && !providers.has(m.provider)) return false;
     for (const c of caps) if (!hasCapability(m, c)) return false;
     if (terms.length === 0) return true;
     const words = [`${m.provider}/${m.id}`, m.name ?? ""];
@@ -92,38 +86,6 @@ export function filterModels(
     const hay = words.join(" ").toLowerCase();
     return terms.every((t) => hay.includes(t));
   });
-}
-
-const PROVIDER_LABELS: Readonly<Record<string, { label: string; title: string }>> = {
-  openrouter: { label: "OpenRouter", title: "OpenRouter" },
-  "vercel-ai-gateway": { label: "Vercel", title: "Vercel AI Gateway" },
-};
-
-/** Terse provider label for badges and chips; unknown providers fall back to the raw id. */
-export function providerLabel(provider: string): string {
-  return PROVIDER_LABELS[provider]?.label ?? provider;
-}
-
-/** Full provider name for titles; unknown providers fall back to the raw id. */
-export function providerTitle(provider: string): string {
-  return PROVIDER_LABELS[provider]?.title ?? provider;
-}
-
-/** Distinct providers in list order. */
-export function providersOf(models: readonly ModelInfo[]): string[] {
-  return [...new Set(models.map((m) => m.provider))];
-}
-
-/** Ids served by more than one provider in this list. */
-export function duplicateIds(models: readonly ModelInfo[]): Set<string> {
-  const seen = new Map<string, string>();
-  const dup = new Set<string>();
-  for (const m of models) {
-    const p = seen.get(m.id);
-    if (p === undefined) seen.set(m.id, m.provider);
-    else if (p !== m.provider) dup.add(m.id);
-  }
-  return dup;
 }
 
 export type SheetState = "detached" | "loading" | "error" | "empty" | "ready";

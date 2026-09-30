@@ -39,12 +39,12 @@ describe("prompt", () => {
 describe("models", () => {
   it("filters by provider, id and name terms", () => {
     const models = [
-      { provider: "vercel-ai-gateway", id: "anthropic/claude-sonnet-5.5" },
-      { provider: "vercel-ai-gateway", id: "openai/gpt-5" },
+      { provider: "openrouter", id: "anthropic/claude-sonnet-5.5" },
+      { provider: "openrouter", id: "openai/gpt-5" },
       { provider: "anthropic", id: "claude-opus-5", name: "Claude Opus" },
     ];
     expect(filterModels(models, "sonnet").map((m) => m.id)).toEqual(["anthropic/claude-sonnet-5.5"]);
-    expect(filterModels(models, "vercel claude")).toHaveLength(1);
+    expect(filterModels(models, "openrouter claude")).toHaveLength(1);
     expect(filterModels(models, "")).toHaveLength(3);
   });
 });
@@ -87,46 +87,12 @@ describe("app", () => {
     expect((document.getElementById("thinking-select") as HTMLSelectElement).value).toBe("high");
   });
 
-  it("selects the new provider's model on a porcupine_failover event", async () => {
-    const id = "anthropic/claude-opus-5.5";
-    const { app, conn } = setup({
-      get_available_models: {
-        success: true,
-        data: {
-          models: [
-            { provider: "vercel-ai-gateway", id, name: "Opus via Vercel" },
-            { provider: "openrouter", id, name: "Opus via OpenRouter" },
-          ],
-        },
-      },
-    });
-    conn.sessionId = "s1";
-    await app.loadModels();
-    await app.setModel({ provider: "vercel-ai-gateway", id, name: "Opus via Vercel" });
-    const selected = (): string[] =>
-      [...document.querySelectorAll('[aria-selected="true"] .model-option-name')].map(
-        (e) => e.textContent ?? "",
-      );
-    expect(selected()).toContain("Opus via Vercel");
-    app.onFrame({
-      t: "event",
-      session: "s1",
-      seq: 5,
-      event: { type: "porcupine_failover", from: { provider: "vercel-ai-gateway", model: id }, to: { provider: "openrouter", model: id }, reason: "429" },
-    });
-    app.render();
-    expect(selected()).toContain("Opus via OpenRouter");
-    expect(selected()).not.toContain("Opus via Vercel");
-    expect(document.querySelector("#model-card .model-card-name")?.textContent).toBe("Opus via OpenRouter");
-    expect(document.getElementById("transcript")?.textContent).toContain("switched to OpenRouter");
-  });
-
   it("uses the documented set_model and set_thinking_level field names", async () => {
     const { app, sent } = setup({});
-    await app.setModel({ provider: "vercel-ai-gateway", id: "anthropic/claude-sonnet-5.5" });
+    await app.setModel({ provider: "anthropic", id: "claude-sonnet-5-5" });
     await app.setThinking("low");
     expect(sent).toEqual([
-      { type: "set_model", provider: "vercel-ai-gateway", modelId: "anthropic/claude-sonnet-5.5" },
+      { type: "set_model", provider: "anthropic", modelId: "claude-sonnet-5-5" },
       { type: "set_thinking_level", level: "low" },
     ]);
   });
@@ -308,7 +274,7 @@ describe("app", () => {
     const { app, conn, sent } = setup({
       get_available_models: {
         success: true,
-        data: { models: [{ provider: "vercel-ai-gateway", id: "anthropic/claude-sonnet-5.5" }, { provider: "vercel-ai-gateway", id: "openai/gpt-5" }] },
+        data: { models: [{ provider: "openrouter", id: "anthropic/claude-sonnet-5.5" }, { provider: "openrouter", id: "openai/gpt-5" }] },
       },
     });
     conn.sessionId = "s1";
@@ -326,7 +292,7 @@ describe("app", () => {
     await vi.waitFor(() => expect(sent.map((c) => c.type)).toContain("set_thinking_level"));
     expect(sent).toEqual([
       { type: "get_available_models" },
-      { type: "set_model", provider: "vercel-ai-gateway", modelId: "openai/gpt-5" },
+      { type: "set_model", provider: "openrouter", modelId: "openai/gpt-5" },
       { type: "set_thinking_level", level: "high" },
     ]);
     await vi.waitFor(() => expect(document.querySelector("#model-card .model-card-name")?.textContent).toBe("openai/gpt-5"));
@@ -451,73 +417,38 @@ describe("app", () => {
     localStorage.clear();
   });
 
-  it("badges duplicated ids, filters by provider chips and keys recents by provider", async () => {
+  it("groups direct-provider ids by vendor, keys recents by provider and drops stale recents", async () => {
     localStorage.clear();
-    localStorage.setItem("porcupine.recentModels", JSON.stringify(["vercel-ai-gateway|anthropic/claude-opus-5.5"]));
-    const two = {
+    localStorage.setItem("porcupine.recentModels", JSON.stringify(["vercel-ai-gateway|anthropic/claude-opus-5.5", "openai|gpt-5"]));
+    const mixed = {
       success: true,
       data: {
         models: [
-          { provider: "openrouter", id: "anthropic/claude-opus-5.5", reasoning: true },
-          { provider: "vercel-ai-gateway", id: "anthropic/claude-opus-5.5", reasoning: true },
-          { provider: "vercel-ai-gateway", id: "openai/gpt-5" },
+          { provider: "anthropic", id: "claude-opus-5-5", reasoning: true },
+          { provider: "openai", id: "gpt-5" },
           { provider: "openrouter", id: "zai/glm-5" },
         ],
       },
     };
-    const { app, conn, sent } = setup({ get_available_models: two });
+    const { app, conn, sent } = setup({ get_available_models: mixed });
     conn.sessionId = "s1";
     app.openSheet();
     await vi.waitFor(() => expect(document.querySelectorAll("#model-groups details")).toHaveLength(3));
-    const rows = () =>
-      [...document.querySelectorAll<HTMLButtonElement>("#model-groups .model-option")].map((b) => [
-        b.querySelector(".model-option-name")?.textContent,
-        b.querySelector(".provider-badge")?.textContent ?? null,
-      ]);
-    expect(rows()).toEqual([
-      ["anthropic/claude-opus-5.5", "OpenRouter"],
-      ["anthropic/claude-opus-5.5", "Vercel"],
-      ["openai/gpt-5", null],
-      ["zai/glm-5", null],
-    ]);
-    const orRow = document.querySelectorAll<HTMLButtonElement>("#model-groups .model-option")[0]!;
-    expect(orRow.getAttribute("aria-label")).toBe("anthropic/claude-opus-5.5, OpenRouter");
-    expect(document.querySelector("#model-recent .provider-badge")?.textContent).toBe("Vercel");
-
-    const pchip = (p: string) => document.querySelector<HTMLButtonElement>(`#model-chips [data-provider="${p}"]`);
-    expect(pchip("openrouter")?.textContent).toBe("OpenRouter");
-    expect(pchip("vercel-ai-gateway")?.title).toBe("Vercel AI Gateway");
-    pchip("vercel-ai-gateway")!.click();
-    expect(pchip("vercel-ai-gateway")?.getAttribute("aria-pressed")).toBe("true");
-    expect(rows()).toEqual([
-      ["anthropic/claude-opus-5.5", "Vercel"],
-      ["openai/gpt-5", null],
-    ]);
-    pchip("vercel-ai-gateway")!.click();
-    expect(rows()).toHaveLength(4);
-
-    document.querySelectorAll<HTMLButtonElement>("#model-groups .model-option")[0]!.click();
-    await vi.waitFor(() => expect(sent).toContainEqual({ type: "set_model", provider: "openrouter", modelId: "anthropic/claude-opus-5.5" }));
-    await vi.waitFor(() =>
-      expect([...document.querySelectorAll("#model-recent .provider-badge")].map((b) => b.textContent)).toEqual(["OpenRouter", "Vercel"]),
-    );
-    expect(JSON.parse(localStorage.getItem("porcupine.recentModels")!)).toEqual([
-      "openrouter|anthropic/claude-opus-5.5",
-      "vercel-ai-gateway|anthropic/claude-opus-5.5",
-    ]);
-    localStorage.clear();
-  });
-
-  it("shows no provider chips with one provider", async () => {
-    const { app, conn } = setup({
-      get_available_models: { success: true, data: { models: [{ provider: "openrouter", id: "a/b" }, { provider: "openrouter", id: "c/d" }] } },
-    });
-    conn.sessionId = "s1";
-    app.openSheet();
-    await vi.waitFor(() => expect(document.querySelectorAll("#model-groups details")).toHaveLength(2));
+    const vendors = [...document.querySelectorAll<HTMLDetailsElement>("#model-groups details")].map((d) => d.dataset.vendor).sort();
+    expect(vendors).toEqual(["anthropic", "openai", "zai"]);
+    const recents = () => [...document.querySelectorAll("#model-recent .model-option-name")].map((e) => e.textContent);
+    expect(recents()).toEqual(["gpt-5"]);
     expect(document.querySelectorAll("#model-chips [data-provider]")).toHaveLength(0);
     expect(document.querySelectorAll("#model-chips .filter-chip")).toHaveLength(4);
-    expect(document.querySelectorAll(".provider-badge")).toHaveLength(0);
+
+    const opus = [...document.querySelectorAll<HTMLButtonElement>("#model-groups .model-option")].find(
+      (b) => b.querySelector(".model-option-name")?.textContent === "claude-opus-5-5",
+    )!;
+    opus.click();
+    await vi.waitFor(() => expect(sent).toContainEqual({ type: "set_model", provider: "anthropic", modelId: "claude-opus-5-5" }));
+    await vi.waitFor(() => expect(recents()).toEqual(["claude-opus-5-5", "gpt-5"]));
+    expect(JSON.parse(localStorage.getItem("porcupine.recentModels")!)[0]).toBe("anthropic|claude-opus-5-5");
+    localStorage.clear();
   });
 
   it("shows distinct model sheet states", async () => {

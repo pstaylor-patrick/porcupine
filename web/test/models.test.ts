@@ -2,12 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   CAPABILITIES,
   CHEAP_INPUT_MAX,
-  duplicateIds,
-  providersOf,
   filterModels,
   migrateRecent,
-  providerLabel,
-  providerTitle,
   recentKey,
   resolveRecent,
   hasCapability,
@@ -35,7 +31,7 @@ describe("parseModel", () => {
       parseModel({
         id: "anthropic/claude-opus-5.5",
         name: "Claude Opus 5.5",
-        provider: "vercel-ai-gateway",
+        provider: "openrouter",
         api: "x",
         reasoning: true,
         contextWindow: 1_000_000,
@@ -45,7 +41,7 @@ describe("parseModel", () => {
     ).toEqual({
       id: "anthropic/claude-opus-5.5",
       name: "Claude Opus 5.5",
-      provider: "vercel-ai-gateway",
+      provider: "openrouter",
       reasoning: true,
       contextWindow: 1_000_000,
       input: ["text", "image"],
@@ -67,13 +63,13 @@ describe("parseModel", () => {
 
 describe("filterModels", () => {
   const models: ModelInfo[] = [
-    { provider: "vercel-ai-gateway", id: "anthropic/claude-sonnet-5.5" },
-    { provider: "vercel-ai-gateway", id: "openai/gpt-5", name: "GPT-5" },
+    { provider: "openrouter", id: "anthropic/claude-sonnet-5.5" },
+    { provider: "openrouter", id: "openai/gpt-5", name: "GPT-5" },
     { provider: "other", id: "claude-x" },
   ];
   it("matches all terms against provider/id and name", () => {
     expect(filterModels(models, "sonnet").map((m) => m.id)).toEqual(["anthropic/claude-sonnet-5.5"]);
-    expect(filterModels(models, "vercel claude")).toHaveLength(1);
+    expect(filterModels(models, "openrouter claude")).toHaveLength(1);
     expect(filterModels(models, "gpt-5")).toHaveLength(1);
     expect(filterModels(models, "  ")).toHaveLength(3);
   });
@@ -91,7 +87,17 @@ describe("sheetState", () => {
 });
 
 describe("vendorOf", () => {
-  it("takes the id prefix", () => expect(vendorOf("anthropic/claude-opus-5.5", "vercel-ai-gateway")).toBe("anthropic"));
+  it("takes the id prefix", () => expect(vendorOf("anthropic/claude-opus-5.5", "openrouter")).toBe("anthropic"));
+  it("groups direct-provider ids under their vendor", () => {
+    expect(vendorOf("claude-opus-5-5", "anthropic")).toBe("anthropic");
+    expect(vendorOf("gpt-5", "openai")).toBe("openai");
+    const groups = groupByVendor([
+      { provider: "anthropic", id: "claude-opus-5-5" },
+      { provider: "openai", id: "gpt-5" },
+      { provider: "openrouter", id: "google/gemini-3-pro" },
+    ]);
+    expect(groups.map((g) => g.vendor).sort()).toEqual(["anthropic", "google", "openai"]);
+  });
   it("falls back to the provider", () => expect(vendorOf("m1", "p")).toBe("p"));
 });
 
@@ -255,62 +261,32 @@ describe("capability filters", () => {
   });
 });
 
-describe("providers", () => {
+describe("recents", () => {
   const OR = "openrouter";
-  const VG = "vercel-ai-gateway";
+  const AN = "anthropic";
   const models: ModelInfo[] = [
     { provider: OR, id: "anthropic/claude-opus-5.5", reasoning: true },
-    { provider: VG, id: "anthropic/claude-opus-5.5", reasoning: true },
-    { provider: VG, id: "openai/gpt-5", reasoning: false },
+    { provider: AN, id: "anthropic/claude-opus-5.5", reasoning: true },
+    { provider: AN, id: "claude-sonnet-5-5", reasoning: false },
     { provider: OR, id: "zai/glm-5", reasoning: true },
   ];
   const ids = (ms: ModelInfo[]) => ms.map((m) => `${m.provider}|${m.id}`);
 
-  it("finds ids served by more than one provider", () => {
-    expect([...duplicateIds(models)]).toEqual(["anthropic/claude-opus-5.5"]);
-    expect(duplicateIds([models[0]!, models[0]!]).size).toBe(0);
-  });
-
-  it("labels known providers and falls back to the raw id", () => {
-    expect(providerLabel(OR)).toBe("OpenRouter");
-    expect(providerLabel(VG)).toBe("Vercel");
-    expect(providerTitle(VG)).toBe("Vercel AI Gateway");
-    expect(providerLabel("acme")).toBe("acme");
-    expect(providerTitle("acme")).toBe("acme");
-  });
-
-  it("filters by provider, OR among providers and AND with capabilities and text", () => {
-    expect(filterModels(models, "", new Set(), new Set())).toBe(models);
-    expect(ids(filterModels(models, "", new Set(), new Set([VG])))).toEqual([`${VG}|anthropic/claude-opus-5.5`, `${VG}|openai/gpt-5`]);
-    expect(filterModels(models, "", new Set(), new Set([VG, OR]))).toHaveLength(4);
-    expect(ids(filterModels(models, "", new Set<Capability>(["thinking"]), new Set([VG])))).toEqual([`${VG}|anthropic/claude-opus-5.5`]);
-    expect(ids(filterModels(models, "glm", new Set(), new Set([OR, VG])))).toEqual([`${OR}|zai/glm-5`]);
-    expect(filterModels(models, "glm", new Set(), new Set([VG]))).toEqual([]);
+  it("drops entries no longer in the list", () => {
+    expect(ids(resolveRecent(["vercel-ai-gateway|anthropic/claude-opus-5.5", `${OR}|zai/glm-5`], models))).toEqual([`${OR}|zai/glm-5`]);
   });
 
   it("migrates id-only recents to provider|id, preferring the current provider, and dedupes", () => {
-    expect(recentKey(models[1]!)).toBe(`${VG}|anthropic/claude-opus-5.5`);
+    expect(recentKey(models[1]!)).toBe(`${AN}|anthropic/claude-opus-5.5`);
     const old = ["anthropic/claude-opus-5.5", `${OR}|zai/glm-5`, "gone/x"];
-    expect(ids(resolveRecent(old, models, VG))).toEqual([`${VG}|anthropic/claude-opus-5.5`, `${OR}|zai/glm-5`]);
+    expect(ids(resolveRecent(old, models, AN))).toEqual([`${AN}|anthropic/claude-opus-5.5`, `${OR}|zai/glm-5`]);
     expect(ids(resolveRecent(old, models))).toEqual([`${OR}|anthropic/claude-opus-5.5`, `${OR}|zai/glm-5`]);
     expect(ids(resolveRecent([`${OR}|zai/glm-5`, "zai/glm-5"], models))).toEqual([`${OR}|zai/glm-5`]);
-    expect(migrateRecent(old, models, VG)).toEqual([`${VG}|anthropic/claude-opus-5.5`, `${OR}|zai/glm-5`, "gone/x"]);
+    expect(migrateRecent(old, models, AN)).toEqual([`${AN}|anthropic/claude-opus-5.5`, `${OR}|zai/glm-5`, "gone/x"]);
     expect(migrateRecent([`${OR}|zai/glm-5`, "zai/glm-5"], models)).toEqual([`${OR}|zai/glm-5`]);
 
     const s = memStorage();
     s.data.set(RECENT_KEY, JSON.stringify(["anthropic/claude-opus-5.5", "zai/glm-5"]));
     expect(pushRecent(s, `${OR}|zai/glm-5`, models, OR)).toEqual([`${OR}|zai/glm-5`, `${OR}|anthropic/claude-opus-5.5`]);
-  });
-});
-
-describe("providersOf", () => {
-  it("lists distinct providers in first-seen order", () => {
-    const ms = [
-      { provider: "openrouter", id: "a/x" },
-      { provider: "vercel-ai-gateway", id: "a/x" },
-      { provider: "openrouter", id: "b/y" },
-    ];
-    expect(providersOf(ms)).toEqual(["openrouter", "vercel-ai-gateway"]);
-    expect(providersOf([])).toEqual([]);
   });
 });

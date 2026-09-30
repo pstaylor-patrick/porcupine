@@ -52,7 +52,7 @@ function handle(cmd) {
   switch (cmd.type) {
     case "get_state":
       return respond(cmd, {
-        model: { id: "anthropic/claude-sonnet-5.5", provider: "vercel-ai-gateway" },
+        model: { id: "anthropic/claude-sonnet-5.5", provider: "openrouter" },
         thinkingLevel: "medium",
         isStreaming: streaming,
         messageCount: messages.length,
@@ -61,6 +61,18 @@ function handle(cmd) {
       return respond(cmd, { messages });
     case "abort":
       return respond(cmd);
+    case "get_available_models":
+      return respond(cmd, {
+        models: [
+          { provider: "openrouter", id: "anthropic/claude-opus-5.5" },
+          { provider: "openrouter", id: "moonshotai/kimi-k3" },
+          { provider: "anthropic", id: "claude-opus-5-5" },
+          { provider: "vercel-ai-gateway", id: "anthropic/claude-opus-5.5" },
+          { provider: "github-copilot", id: "gpt-5" },
+        ],
+      });
+    case "set_model":
+      return respond(cmd, { provider: cmd.provider, id: cmd.modelId });
     case "extension_ui_response": {
       const p = waiting.get(cmd.id);
       if (p) {

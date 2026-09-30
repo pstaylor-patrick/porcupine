@@ -5,7 +5,6 @@ import {
   DEFAULT_THINKING,
   buildChildEnv,
   buildPiArgs,
-  resolveDefaultProvider,
   resolveDefaults,
   parseCliArgs,
   parseEnvFile,
@@ -53,18 +52,25 @@ describe("buildChildEnv", () => {
   const fileEnv = {
     VERCEL_AI_GATEWAY_API_KEY: "vk",
     OPENROUTER_API_KEY: "ok",
+    ANTHROPIC_API_KEY: "ak",
+    OPENAI_API_KEY: "sk-test",
     PORCUPINE_RPC_PASSWORD: "hunter2",
     PORCUPINE_COOKIE_SECRET: "c",
   };
-  it("maps VERCEL_AI_GATEWAY_API_KEY to AI_GATEWAY_API_KEY", () => {
-    expect(buildChildEnv({ PATH: "/bin" }, fileEnv).AI_GATEWAY_API_KEY).toBe("vk");
+  it("never passes a Vercel AI Gateway key", () => {
+    const env = buildChildEnv({ AI_GATEWAY_API_KEY: "mine" }, fileEnv);
+    expect(env.AI_GATEWAY_API_KEY).toBeUndefined();
+    expect(Object.values(env)).not.toContain("vk");
+    expect(Object.values(env)).not.toContain("mine");
+  });
+  it("passes the Anthropic and OpenAI keys from the env file", () => {
+    const env = buildChildEnv({ PATH: "/bin" }, fileEnv);
+    expect(env.ANTHROPIC_API_KEY).toBe("ak");
+    expect(env.OPENAI_API_KEY).toBe("sk-test");
   });
   it("passes OPENROUTER_API_KEY from the env file", () => {
     expect(buildChildEnv({ PATH: "/bin" }, fileEnv).OPENROUTER_API_KEY).toBe("ok");
     expect(buildChildEnv({ OPENROUTER_API_KEY: "mine" }, fileEnv).OPENROUTER_API_KEY).toBe("mine");
-  });
-  it("keeps an existing AI_GATEWAY_API_KEY", () => {
-    expect(buildChildEnv({ AI_GATEWAY_API_KEY: "mine" }, fileEnv).AI_GATEWAY_API_KEY).toBe("mine");
   });
   it("never passes the password or cookie secret", () => {
     const env = buildChildEnv({ PORCUPINE_RPC_PASSWORD: "hunter2", PORCUPINE_COOKIE_SECRET: "c" }, fileEnv);
@@ -91,6 +97,11 @@ describe("OpenRouter key shim", () => {
     expect(env.OPENROUTER_API_KEY).toBe("sk-or-test");
     expect(env.OPENAI_API_KEY).toBeUndefined();
   });
+  it("replaces an sk-or- OPENAI_API_KEY with a real one from the env file", () => {
+    const env = buildChildEnv({ OPENAI_API_KEY: "sk-or-test" }, { OPENAI_API_KEY: "sk-test" });
+    expect(env.OPENAI_API_KEY).toBe("sk-test");
+    expect(env.OPENROUTER_API_KEY).toBe("sk-or-test");
+  });
   it("leaves a real OpenAI key alone", () => {
     const env = buildChildEnv({ OPENAI_API_KEY: "sk-test" }, {});
     expect(env.OPENAI_API_KEY).toBe("sk-test");
@@ -98,21 +109,24 @@ describe("OpenRouter key shim", () => {
   });
 });
 
-describe("resolveDefaultProvider", () => {
-  it("honours PORCUPINE_PROVIDER", () => {
-    expect(resolveDefaultProvider({ PORCUPINE_PROVIDER: "vercel-ai-gateway", OPENROUTER_API_KEY: "sk-or-test" })).toBe(
-      "vercel-ai-gateway",
-    );
+describe("resolveDefaults", () => {
+  it("uses OpenRouter without an Anthropic key", () => {
+    expect(resolveDefaults({ OPENROUTER_API_KEY: "sk-or-test", AI_GATEWAY_API_KEY: "vk" })).toEqual({
+      provider: "openrouter",
+      model: DEFAULT_MODEL,
+    });
+    expect(resolveDefaults({})).toEqual({ provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL });
   });
-  it("prefers openrouter when its key is set", () => {
-    expect(resolveDefaultProvider({ OPENROUTER_API_KEY: "sk-or-test", AI_GATEWAY_API_KEY: "vk" })).toBe("openrouter");
+  it("uses the Anthropic API when its key is set", () => {
+    expect(resolveDefaults({ ANTHROPIC_API_KEY: "ak" })).toEqual({ provider: "anthropic", model: "claude-opus-5-5" });
   });
-  it("falls back to vercel-ai-gateway", () => {
-    expect(resolveDefaultProvider({})).toBe("vercel-ai-gateway");
-  });
-  it("applies a PORCUPINE_MODEL override", () => {
-    expect(resolveDefaults({ PORCUPINE_MODEL: "x/y" }).model).toBe("x/y");
-    expect(resolveDefaults({}).model).toBe(DEFAULT_MODEL);
+  it("routes a PORCUPINE_MODEL override", () => {
+    expect(resolveDefaults({ PORCUPINE_MODEL: "x/y" })).toEqual({ provider: "openrouter", model: "x/y" });
+    expect(resolveDefaults({ PORCUPINE_MODEL: "openai/gpt-5" })).toEqual({ provider: "openrouter", model: "openai/gpt-5" });
+    expect(resolveDefaults({ PORCUPINE_MODEL: "openai/gpt-5", OPENAI_API_KEY: "sk-test" })).toEqual({
+      provider: "openai",
+      model: "gpt-5",
+    });
   });
 });
 

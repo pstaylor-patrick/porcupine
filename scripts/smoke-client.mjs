@@ -13,7 +13,7 @@ if (!BASE) throw new Error("SMOKE_BASE_URL is required (scripts/smoke.sh sets it
 const PASSWORD = process.env.SMOKE_PASSWORD;
 const NAME = process.env.SMOKE_SESSION_NAME ?? "smoke";
 const RUN_TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS ?? 180_000);
-const EXPECTED_MODEL = { provider: "vercel-ai-gateway", id: "anthropic/claude-opus-5.5" };
+const ROUTED_PROVIDERS = new Set(["openrouter", "anthropic", "openai"]);
 
 function log(msg) {
   console.log(`smoke: ${msg}`);
@@ -144,8 +144,8 @@ async function main() {
   const models = await conn.cmd({ type: "get_available_models" });
   const list = models.data?.models ?? [];
   assert(
-    models.success && list.some((m) => m.provider === EXPECTED_MODEL.provider && m.id === EXPECTED_MODEL.id),
-    `get_available_models includes ${EXPECTED_MODEL.provider}/${EXPECTED_MODEL.id} (${list.length} models)`,
+    models.success && list.length > 0 && list.every((m) => ROUTED_PROVIDERS.has(m.provider)),
+    `get_available_models lists only routed providers (${list.length} models)`,
   );
 
   const thinking = await conn.cmd({ type: "set_thinking_level", level: "low" });

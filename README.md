@@ -32,8 +32,8 @@ phone / laptop ──HTTPS──> reverse proxy ──> porcupine-hub ──unix
 - A private network between the host and your devices (Tailscale, WireGuard or a LAN)
 - HTTPS in front of the hub. Service workers and `Secure` cookies need it;
   [examples/Caddyfile](examples/Caddyfile) shows one way.
-- A model provider key pi can use (OpenRouter or Vercel AI Gateway). The default model is
-  `anthropic/claude-opus-5.5` with low thinking.
+- An OpenRouter API key. Anthropic and OpenAI keys are optional. The default model is
+  Claude Opus 5.5 with low thinking.
 
 ## Install
 
@@ -61,11 +61,17 @@ Settings come from the process environment or the env file
 | `PORCUPINE_RPC_PASSWORD` | required | Login password |
 | `PORCUPINE_COOKIE_SECRET` | required | Cookie signing key, `openssl rand -hex 32` |
 | `PORCUPINE_HUB_ADDR` | `127.0.0.1:8787` | Hub listen address; use a Docker bridge IP if the proxy runs in Docker |
-| `OPENROUTER_API_KEY` | | OpenRouter key; when set, OpenRouter is the default provider, else Vercel AI Gateway |
-| `PORCUPINE_PROVIDER` | auto | Default pi provider for new sessions |
-| `PORCUPINE_MODEL` | `anthropic/claude-opus-5.5` | Default model for new sessions |
-| `VERCEL_AI_GATEWAY_API_KEY` | | Passed to pi as `AI_GATEWAY_API_KEY` |
+| `OPENROUTER_API_KEY` | required | OpenRouter key; serves every model not routed direct |
+| `ANTHROPIC_API_KEY` | | Optional; serves Anthropic models from the Anthropic API |
+| `OPENAI_API_KEY` | | Optional; serves OpenAI models from the OpenAI API |
+| `PORCUPINE_MODEL` | `anthropic/claude-opus-5.5` | Default model for new sessions, as an OpenRouter-style `vendor/model` id; routed like any other |
 | `PORCUPINE_RUNTIME_DIR` | `$XDG_RUNTIME_DIR/porcupine` | Session sockets |
+
+Each model comes from exactly one provider. Anthropic models come from the
+Anthropic API when `ANTHROPIC_API_KEY` is set, and OpenAI models from the OpenAI
+API when `OPENAI_API_KEY` is set; everything else, and those two vendors while
+their key is missing, comes from OpenRouter. The model list hides every other
+copy, so adding a direct key moves that vendor's models off OpenRouter.
 
 ## Run
 

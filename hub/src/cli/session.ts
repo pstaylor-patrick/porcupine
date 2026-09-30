@@ -8,7 +8,7 @@ import { PiProcess } from "./pi-process.js";
 import { SocketServer } from "./socket-server.js";
 import { handleUiRequest } from "./ui-autocancel.js";
 import { slugify } from "./args.js";
-import { Failover } from "./failover.js";
+import { filterModelsResponse, rejectSetModel } from "./routing.js";
 
 export interface SessionOptions {
   name: string;
@@ -91,7 +91,6 @@ export async function startSession(o: SessionOptions): Promise<Session> {
     rmSync(paths.meta, { force: true });
   };
 
-  let failover: Failover | null = null;
   const pi = new PiProcess({
     bin: o.piBin,
     args: o.piArgs,
@@ -103,7 +102,6 @@ export async function startSession(o: SessionOptions): Promise<Session> {
       publish(e);
       // Pi resolves a dialog itself on timeout or abort; the run settling means none is still open.
       if (e.type === "agent_settled") for (const id of [...pendingDialogs]) resolveDialog(id);
-      void failover?.onEvent(e).catch((err: unknown) => o.log(`error: failover: ${(err as Error).message}`));
     },
     onUiRequest: (req) => {
       const d = handleUiRequest(req, { browserAttached: (server?.attachedCount ?? 0) > 0 });
@@ -117,21 +115,15 @@ export async function startSession(o: SessionOptions): Promise<Session> {
     onExit: () => undefined,
   });
   meta.piPid = pi.pid;
-  failover = new Failover({
-    send: (cmd) => pi.send(cmd),
-    publish,
-    log: o.log,
-    env: o.childEnv,
-    current: () => (meta.provider && meta.model ? { provider: meta.provider, model: meta.model } : null),
-    setCurrent: (m) => {
-      meta.provider = m.provider;
-      meta.model = m.model;
-    },
-  });
   const sendToPi = async (cmd: PiCommand): Promise<PiResponse> => {
-    failover?.onCommand(cmd);
+    const rejected = rejectSetModel(cmd, o.childEnv);
+    if (rejected) return rejected;
     const r = await pi.send(cmd);
-    failover?.onResult(cmd, r);
+    if (cmd.type === "get_available_models") return filterModelsResponse(r, o.childEnv);
+    if (cmd.type === "set_model" && r.success) {
+      meta.provider = cmd.provider as string;
+      meta.model = cmd.modelId as string;
+    }
     return r;
   };
 
