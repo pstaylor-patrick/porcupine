@@ -1,0 +1,198 @@
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import type { Duplex } from "node:stream";
+import { WebSocketServer } from "ws";
+import {
+  LoginRateLimiter,
+  clearedCookie,
+  clientIp,
+  isAuthed,
+  passwordMatches,
+  sessionCookie,
+  signCookie,
+  type Clock,
+} from "./auth.js";
+import type { HubConfig } from "./config.js";
+import { Registry } from "./registry.js";
+import { BrowserRelay, MAX_BROWSER_FRAME } from "./relay.js";
+import { applySecurityHeaders, isPublicPath, serveStatic } from "./static.js";
+
+export interface HubOptions {
+  config: HubConfig;
+  now?: Clock;
+  limiter?: LoginRateLimiter;
+  log?: (line: string) => void;
+  rescanMs?: number;
+}
+
+export interface Hub {
+  server: Server;
+  registry: Registry;
+  listen(): Promise<{ port: number }>;
+  close(): Promise<void>;
+}
+
+const FALLBACK_LOGIN = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Porcupine login</title></head>
+<body><main><h1>Porcupine</h1>
+<form method="post" action="/api/login">
+<label>Password <input type="password" name="password" autocomplete="current-password" required autofocus></label>
+<button type="submit">Log in</button></form></main></body></html>
+`;
+
+function readBody(req: IncomingMessage, limit: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => {
+      size += c.length;
+      if (size > limit) {
+        resolve(null);
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", () => resolve(null));
+  });
+}
+
+function rejectUpgrade(socket: Duplex, status: number, text: string): void {
+  socket.end(`HTTP/1.1 ${status} ${text}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+}
+
+export function createHub(opts: HubOptions): Hub {
+  const { config } = opts;
+  const now = opts.now ?? Date.now;
+  const log = opts.log ?? ((l: string) => console.log(l));
+  const limiter = opts.limiter ?? new LoginRateLimiter({ perIp: 5, global: 20, windowMs: 15 * 60 * 1000, now });
+  const secure = !config.dev;
+  const relays = new Set<BrowserRelay>();
+  const registry = new Registry({
+    runtimeDir: config.runtimeDir,
+    log,
+    rescanMs: opts.rescanMs ?? 5000,
+    onChange: () => relays.forEach((r) => r.sessionsChanged()),
+    onSessionEnded: (id) => relays.forEach((r) => r.sessionEnded(id)),
+  });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_BROWSER_FRAME });
+  wss.on("connection", (ws) => {
+    const relay = new BrowserRelay(ws, registry);
+    relays.add(relay);
+    ws.on("close", () => relays.delete(relay));
+  });
+
+  const loginPage = (): string => {
+    const built = join(config.webDist, "login.html");
+    return existsSync(built) ? readFileSync(built, "utf8") : FALLBACK_LOGIN;
+  };
+
+  const authed = (req: IncomingMessage): boolean => isAuthed(req, config.cookieSecret, now);
+
+  async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    applySecurityHeaders(res);
+    const url = new URL(req.url ?? "/", "http://hub");
+    const path = url.pathname;
+    const method = req.method ?? "GET";
+
+    if (path === "/api/login" && method === "POST") {
+      const ip = clientIp(req);
+      if (limiter.blocked(ip)) {
+        log(`login rate limited ip=${ip}`);
+        res.writeHead(429, { "Content-Type": "text/plain", "Retry-After": "900" }).end("too many attempts\n");
+        return;
+      }
+      const body = await readBody(req, 4096);
+      const password = body === null ? "" : (new URLSearchParams(body).get("password") ?? "");
+      if (body === null || !passwordMatches(password, config.password)) {
+        limiter.fail(ip);
+        log(`login failed ip=${ip}`);
+        res.writeHead(303, { Location: "/login?error=1" }).end();
+        return;
+      }
+      log(`login ok ip=${ip}`);
+      res
+        .writeHead(303, {
+          Location: "/",
+          "Set-Cookie": sessionCookie(signCookie(config.cookieSecret, config.cookieTtlSec, now), config.cookieTtlSec, secure),
+        })
+        .end();
+      return;
+    }
+    if (path === "/api/logout" && method === "POST") {
+      res.writeHead(303, { Location: "/login", "Set-Cookie": clearedCookie(secure) }).end();
+      return;
+    }
+    if (path === "/api/me") {
+      const ok = authed(req);
+      res.writeHead(ok ? 200 : 401, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ authenticated: ok }) + "\n");
+      return;
+    }
+    if (path.startsWith("/api/")) {
+      res.writeHead(404, { "Content-Type": "text/plain" }).end("not found\n");
+      return;
+    }
+    if (method !== "GET" && method !== "HEAD") {
+      res.writeHead(405, { Allow: "GET, HEAD" }).end();
+      return;
+    }
+    if (path === "/login") {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+      res.end(method === "HEAD" ? undefined : loginPage());
+      return;
+    }
+    if (!isPublicPath(path) && !authed(req)) {
+      res.writeHead(303, { Location: "/login" }).end();
+      return;
+    }
+    if (!serveStatic(config.webDist, path, res, method)) {
+      res.writeHead(404, { "Content-Type": "text/plain" }).end("not found\n");
+    }
+  }
+
+  const server = createServer((req, res) => {
+    handle(req, res).catch((e: unknown) => {
+      log(`error: ${(e as Error).message}`);
+      if (!res.headersSent) res.writeHead(500).end();
+      else res.destroy();
+    });
+  });
+
+  server.on("upgrade", (req, socket, head) => {
+    socket.on("error", () => undefined);
+    const path = new URL(req.url ?? "/", "http://hub").pathname;
+    if (path !== "/ws") return rejectUpgrade(socket, 404, "Not Found");
+    if (!authed(req)) return rejectUpgrade(socket, 401, "Unauthorized");
+    const origin = req.headers.origin;
+    if (!origin || !config.origins.includes(origin)) {
+      log(`ws rejected: bad origin ${origin ?? "(none)"}`);
+      return rejectUpgrade(socket, 403, "Forbidden");
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
+  });
+
+  return {
+    server,
+    registry,
+    async listen() {
+      await registry.start();
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(config.port, config.host, () => resolve());
+      });
+      const addr = server.address();
+      return { port: typeof addr === "object" && addr ? addr.port : config.port };
+    },
+    async close() {
+      registry.stop();
+      for (const c of wss.clients) c.terminate();
+      wss.close();
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    },
+  };
+}

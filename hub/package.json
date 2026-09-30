@@ -7,14 +7,19 @@
     "piVersion": "0.99.1"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && chmod +x dist/cli/main.js",
+    "build": "tsc -p tsconfig.build.json && chmod +x dist/cli/main.js dist/server/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0"
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.18.2"
   },
   "bin": {
-    "porcupine": "dist/cli/main.js"
+    "porcupine": "dist/cli/main.js",
+    "porcupine-hub": "dist/server/main.js"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
   }
 }
