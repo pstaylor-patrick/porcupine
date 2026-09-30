@@ -1,11 +1,22 @@
-<p align="center"><img src="docs/logo.png" width="128" alt="Porcupine logo"></p>
+<p align="center"><img src="docs/hero.gif" width="480" alt="Porcupine: a lilac crayon scribble draws in and settles on the porcupine logo"></p>
+<h1 align="center">Porcupine</h1>
+<p align="center">Drive your pi coding-agent sessions from your phone.</p>
+<p align="center">
+  <a href="https://github.com/pstaylor-patrick/porcupine/actions/workflows/ci.yml"><img src="https://github.com/pstaylor-patrick/porcupine/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22-brightgreen" alt="Node 22+"></a>
+</p>
 
-# Porcupine
+Porcupine is a small, mobile-first PWA for [pi](https://github.com/earendil-works/pi)
+coding-agent sessions. You start sessions in tmux on a machine you own; from a
+phone or laptop browser you watch them stream, send prompts, switch models,
+answer the agent's questions and stop runs. There is no cloud component.
 
-A small, mobile-first PWA for driving [pi](https://github.com/earendil-works/pi)
-coding-agent sessions from your phone or laptop. You start sessions in tmux on
-a machine you own; porcupine lets you watch them stream, send prompts, switch
-models, answer the agent's questions and stop runs from a browser.
+> [!WARNING]
+> A logged-in user can run shell commands on the host through the agent. Read
+> [SECURITY.md](SECURITY.md) before exposing porcupine anywhere.
+
+## How it works
 
 ```
 phone / laptop ──HTTPS──> reverse proxy ──> porcupine-hub ──unix socket──> porcupine (in tmux) ──stdio──> pi --mode rpc
@@ -13,10 +24,7 @@ phone / laptop ──HTTPS──> reverse proxy ──> porcupine-hub ──unix
 
 - `porcupine` wraps `pi --mode rpc` in a tmux pane and exposes it on a local Unix socket.
 - `porcupine-hub` serves the PWA, checks the password and relays each browser to a session.
-- Everything stays on your host and private network. There is no cloud component.
-
-See [SECURITY.md](SECURITY.md) before exposing it anywhere: a logged-in user can
-run shell commands on the host through the agent.
+- Everything stays on your host and private network.
 
 ## Requirements
 
@@ -39,8 +47,8 @@ ruby install.rb
 
 `install.rb` checks prerequisites, builds, installs the pinned pi under
 `~/.local`, links `porcupine` and `porcupine-hub` into `~/.local/bin`, enables
-the repo's pre-commit hook and reports which settings are missing. Rerun it
-after each pull. `--no-pi` skips the pi install.
+the pre-commit hook and reports missing settings. Rerun it after each pull;
+`--no-pi` skips the pi install.
 
 ## Configuration
 
@@ -117,6 +125,12 @@ your machine.
 - Cookie secret: replace `PORCUPINE_COOKIE_SECRET`, restart the hub. Every browser is logged out.
 - Password: change `PORCUPINE_RPC_PASSWORD`, restart the hub.
 - DNS-01 key: `scripts/caddy-keys.sh`, restart the proxy, then delete the old key with `aws iam delete-access-key`.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks and pull request
+conventions. Report vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md), not in public issues.
 
 ## License
 
