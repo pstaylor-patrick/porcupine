@@ -157,6 +157,9 @@ export class App {
     $("abort").addEventListener("click", () => void this.abort());
     $("menu-button").addEventListener("click", () => this.toggleSidebar());
     $("sheet-button").addEventListener("click", () => (this.overlays.includes("sheet") ? this.close("sheet") : this.openSheet()));
+    $("session-title").addEventListener("click", () =>
+      this.overlays.includes("sheet") ? this.close("sheet") : this.openSheet($("session-title")),
+    );
     $("sheet-close").addEventListener("click", () => this.close("sheet"));
     $("scrim").addEventListener("click", () => this.closeTop());
     $("dialog-close").addEventListener("click", () => this.close("dialog"));
@@ -178,12 +181,12 @@ export class App {
 
   // ---- overlays -------------------------------------------------------
 
-  private open(o: Overlay, focusId: string): void {
+  private open(o: Overlay, focusId: string, explicitOpener?: HTMLElement): void {
     if (!this.overlays.includes(o)) {
       const active = document.activeElement;
       // Safari does not focus buttons on tap, so fall back to the control that opens this overlay.
       const opener = document.getElementById(o === "sheet" ? "sheet-button" : o === "dialog" ? "input" : "menu-button");
-      this.returnFocus.set(o, active instanceof HTMLElement && active !== document.body ? active : opener);
+      this.returnFocus.set(o, explicitOpener ?? (active instanceof HTMLElement && active !== document.body ? active : opener));
       this.overlays.push(o);
     }
     this.syncOverlays();
@@ -222,9 +225,9 @@ export class App {
     return current?.id || document.querySelector<HTMLElement>("#session-list button")?.id || "settings-link";
   }
 
-  openSheet(): void {
+  openSheet(opener?: HTMLElement): void {
     // Focusing the filter on iOS pops the keyboard over the list, so land on the heading.
-    this.open("sheet", "sheet-title");
+    this.open("sheet", "sheet-title", opener);
     this.renderHeader();
     void this.loadModels();
   }
@@ -254,6 +257,7 @@ export class App {
     if (!desktop) $("menu-button").setAttribute("aria-expanded", String(sidebarOpen));
     $("sheet").dataset.open = String(sheetOpen);
     $("sheet-button").setAttribute("aria-expanded", String(sheetOpen));
+    $("session-title").setAttribute("aria-expanded", String(sheetOpen));
     $("settings").hidden = !settingsOpen;
     $("scrim").hidden = !(sheetOpen || sidebarOpen || dialogOpen);
     $("scrim").dataset.for = sheetOpen || dialogOpen ? "sheet" : "sidebar";
@@ -644,7 +648,12 @@ export class App {
     const s = this.sessions.find((x) => x.id === this.conn.sessionId);
     const title = $("session-title");
     title.textContent = s ? s.name : "Porcupine";
-    title.title = s ? s.cwd : "";
+    title.title = s ? s.name : "";
+    title.setAttribute("aria-label", s ? `Session settings for ${s.name}` : "Session settings");
+    $("session-card-name").textContent = s ? s.name : "No session";
+    const cwd = $("session-card-cwd");
+    cwd.textContent = s ? s.cwd : "";
+    cwd.hidden = !s;
     const attached = this.conn.sessionId !== null;
     ($("new-session") as HTMLButtonElement).disabled = !attached;
   }

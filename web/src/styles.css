@@ -115,6 +115,21 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fo
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.session-title-button {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
 select {
   background: var(--bg);
   border: 1px solid var(--line);

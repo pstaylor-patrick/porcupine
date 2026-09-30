@@ -35,7 +35,7 @@
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
         </button>
         <svg class="brand-logo" aria-hidden="true" focusable="false" viewBox="100 220 870 590" fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"><path d="M330 425L462 265M405 440L610 252M455 485L745 295M495 525L885 365M530 572L940 458M570 612L910 552M335 420C290 400 240 415 200 445C155 480 120 530 142 572C185 588 250 578 300 545M142 572L228 578L182 630C240 680 400 718 520 714C580 710 600 690 612 678C690 655 780 645 858 642M262 520C250 490 275 470 290 488C300 505 285 530 262 520M232 690L226 760L292 762L302 712M425 715L425 785L505 785L515 700M466 735L466 782"/></svg>
-        <h1 id="session-title" class="session-title">Porcupine</h1>
+        <h1 class="session-title"><button id="session-title" type="button" class="session-title-button" aria-haspopup="dialog" aria-controls="sheet" aria-expanded="false" aria-label="Session settings">Porcupine</button></h1>
         <button type="button" class="icon-button theme-toggle" aria-label="Switch to dark theme"><svg data-icon="moon" width="20" height="20" aria-hidden="true" focusable="false" viewBox="0 0 256 256" fill="currentColor"><path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/></svg><svg data-icon="sun" width="20" height="20" aria-hidden="true" focusable="false" hidden viewBox="0 0 256 256" fill="currentColor"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/></svg></button>
         <button id="sheet-button" type="button" class="icon-button" aria-label="Session settings" aria-haspopup="dialog" aria-controls="sheet" aria-expanded="false">
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="16" cy="7" r="2" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="10" cy="17" r="2" stroke="currentColor" stroke-width="2" fill="none"/></svg>
@@ -69,6 +69,13 @@
         <button id="sheet-close" type="button" class="icon-button" aria-label="Close session settings">&#x2715;</button>
       </div>
       <div class="sheet-body">
+        <div class="field">
+          <span class="field-label" id="session-label">Session</span>
+          <div id="session-card" class="model-card" aria-labelledby="session-label">
+            <p id="session-card-name" class="model-card-name">No session</p>
+            <p id="session-card-cwd" class="model-card-vendor" hidden></p>
+          </div>
+        </div>
         <div class="field">
           <span class="field-label" id="model-label">Model</span>
           <div id="model-card" class="model-card"><p class="model-card-name">No model selected</p></div>

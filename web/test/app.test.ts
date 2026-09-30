@@ -216,6 +216,36 @@ describe("app", () => {
     expect(app.overlays).toEqual([]);
   });
 
+  it("shows the full session name and cwd in the sheet", () => {
+    const { app, conn } = setup({});
+    vi.spyOn(conn, "attach").mockImplementation((id) => {
+      conn.sessionId = id;
+    });
+    app.onFrame({ t: "sessions", sessions });
+    expect(byId("session-card-name").textContent).toBe("No session");
+    expect(byId("session-card-cwd").hidden).toBe(true);
+    app.selectSession("s1");
+    expect(byId("session-card-name").textContent).toBe("alpha");
+    expect(byId("session-card-cwd").textContent).toBe("/home/me/code/alpha");
+    expect(byId("session-card-cwd").hidden).toBe(false);
+    expect(byId("session-title").getAttribute("aria-label")).toBe("Session settings for alpha");
+  });
+
+  it("opens the sheet from the title and returns focus to it", () => {
+    setup({});
+    byId("session-title").click();
+    expect(byId("sheet").dataset.open).toBe("true");
+    expect(byId("session-title").getAttribute("aria-expanded")).toBe("true");
+    byId("sheet-close").click();
+    expect(byId("sheet").dataset.open).toBe("false");
+    expect(document.activeElement?.id).toBe("session-title");
+    byId("session-title").click();
+    expect(byId("sheet").dataset.open).toBe("true");
+    document.dispatchEvent(esc());
+    expect(byId("sheet").dataset.open).toBe("false");
+    expect(document.activeElement?.id).toBe("session-title");
+  });
+
   it("Esc closes an open overlay before it aborts", async () => {
     const { app, conn, sent } = setup({});
     conn.sessionId = "s1";
