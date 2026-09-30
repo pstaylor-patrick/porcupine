@@ -296,6 +296,17 @@ describe("app", () => {
     expect(select.value).toBe("off");
   });
 
+  it("toggles body.is-streaming with the run status", () => {
+    const { app } = setup({});
+    app.t.isStreaming = true;
+    app.render();
+    expect(document.body.classList.contains("is-streaming")).toBe(true);
+    expect(byId("run-status").textContent).toBe("Running");
+    app.t.isStreaming = false;
+    app.render();
+    expect(document.body.classList.contains("is-streaming")).toBe(false);
+  });
+
   it("uses the steer toggle from the sheet for prompts sent while streaming", async () => {
     const { app, conn, sent } = setup({});
     conn.sessionId = "s1";

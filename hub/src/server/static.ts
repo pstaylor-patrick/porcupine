@@ -34,7 +34,8 @@ export function isPublicPath(path: string): boolean {
     path === "/apple-touch-icon.png" ||
     path === "/favicon.ico" ||
     path.startsWith("/icons/") ||
-    path.startsWith("/fonts/")
+    path.startsWith("/fonts/") ||
+    path.startsWith("/crayon/")
   );
 }
 

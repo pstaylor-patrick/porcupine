@@ -44,6 +44,8 @@ beforeEach(async () => {
   writeFileSync(join(dir, "web", "index.html"), "<!doctype html><title>app</title>");
   mkdirSync(join(dir, "web", "fonts"));
   writeFileSync(join(dir, "web", "fonts", "texgyreschola-regular-latin.woff2"), "wOF2");
+  mkdirSync(join(dir, "web", "crayon"));
+  writeFileSync(join(dir, "web", "crayon", "scribble.svg"), "<svg/>");
   session = null;
   hub = createHub({ config: config(), log: () => undefined, rescanMs: 100 });
   const { port } = await hub.listen();
@@ -159,6 +161,14 @@ describe("hub HTTP and auth", () => {
     const r = await fetch(`${base}/fonts/texgyreschola-regular-latin.woff2`, { redirect: "manual" });
     expect(r.status).toBe(200);
     expect(r.headers.get("content-type")).toBe("font/woff2");
+  });
+
+  it("serves /crayon/ svgs without a cookie as image/svg+xml", async () => {
+    expect(isPublicPath("/crayon/scribble.svg")).toBe(true);
+    expect(isPublicPath("/crayonx")).toBe(false);
+    const r = await fetch(`${base}/crayon/scribble.svg`, { redirect: "manual" });
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toBe("image/svg+xml");
   });
 
   it("serves /theme-init.js without a cookie", async () => {

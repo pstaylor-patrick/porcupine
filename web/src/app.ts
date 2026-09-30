@@ -658,6 +658,7 @@ export class App {
     $("abort").hidden = !streaming;
     $("send").hidden = streaming && !this.input.value.trim();
     $("run-status").textContent = streaming ? "Running" : "Idle";
+    document.body.classList.toggle("is-streaming", streaming);
     $("empty").hidden = this.conn.sessionId !== null;
     if (nearBottom) this.main.scrollTop = this.main.scrollHeight;
   }

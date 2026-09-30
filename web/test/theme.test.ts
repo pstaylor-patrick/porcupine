@@ -30,7 +30,7 @@ beforeEach(() => {
   delete document.documentElement.dataset.theme;
   sessionStorage.clear();
   document.head.innerHTML = /<head>([\s\S]*)<\/head>/.exec(loginHtml)?.[1]?.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<link[^>]*>/g, "") ?? "";
-  document.body.innerHTML = (/<body>([\s\S]*)<\/body>/.exec(loginHtml)?.[1] ?? "");
+  document.body.innerHTML = (/<body[^>]*>([\s\S]*)<\/body>/.exec(loginHtml)?.[1] ?? "");
   vi.spyOn(window, "matchMedia").mockImplementation((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList);
 });
 
