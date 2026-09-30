@@ -89,10 +89,12 @@ export class SocketServer {
         this.write(sock, { t: "result", cid, response: { success: false, error: "command not allowed" } });
         return;
       }
-      // Strip any client-supplied id: the CLI owns pi ids.
+      // Strip any client-supplied id: the CLI owns pi ids. A dialog answer's id
+      // names the dialog instead, and the session checks it against open ones.
       const { id: _ignored, ...rest } = cmd as PiCommand & { id?: unknown };
       void _ignored;
-      void this.opts.send(rest as PiCommand).then((response) => this.write(sock, { t: "result", cid, response }));
+      const outgoing = cmd.type === "extension_ui_response" ? cmd : (rest as PiCommand);
+      void this.opts.send(outgoing).then((response) => this.write(sock, { t: "result", cid, response }));
       return;
     }
     this.write(sock, { t: "error", message: "unknown frame" });
@@ -100,6 +102,10 @@ export class SocketServer {
 
   broadcast(frame: CliToHubFrame): void {
     for (const s of this.attached) this.write(s, frame);
+  }
+
+  get attachedCount(): number {
+    return this.attached.size;
   }
 
   get connectionCount(): number {

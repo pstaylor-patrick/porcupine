@@ -1,4 +1,5 @@
 /** App controller: wires the connection, transcript model, renderer and composer together. */
+import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
 import { TranscriptView } from "./render.js";
 import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./transcript.js";
 import { Connection, type PiResponse, type ServerFrame, type SessionInfo } from "./ws.js";
@@ -13,7 +14,7 @@ export interface ComposerActions {
 }
 
 /** Overlays close in this order on Esc: the topmost one wins. */
-export type Overlay = "sheet" | "sidebar" | "settings";
+export type Overlay = "sheet" | "sidebar" | "settings" | "dialog";
 
 export function basename(path: string): string {
   const trimmed = path.replace(/\/+$/, "");
@@ -90,6 +91,9 @@ export class App {
   /** Wide layout: sidebar docked, sheet as a right panel. Overridable for tests. */
   isDesktop: () => boolean = () => typeof window.matchMedia === "function" && window.matchMedia("(min-width: 900px)").matches;
   navigate: (url: string) => void = (url) => location.assign(url);
+  readonly dialogs = new DialogQueue();
+  /** The dialog shown in the sheet; hiding the sheet keeps it pending. */
+  private shownDialog: Dialog | null = null;
   private readonly returnFocus = new Map<Overlay, HTMLElement | null>();
   private modelsLoading: Promise<void> | null = null;
   private resetting = false;
@@ -147,6 +151,8 @@ export class App {
     $("sheet-button").addEventListener("click", () => (this.overlays.includes("sheet") ? this.close("sheet") : this.openSheet()));
     $("sheet-close").addEventListener("click", () => this.close("sheet"));
     $("scrim").addEventListener("click", () => this.closeTop());
+    $("dialog-close").addEventListener("click", () => this.close("dialog"));
+    $("dialog-reopen").addEventListener("click", () => this.showDialog());
     $("settings-link").addEventListener("click", () => this.openSettings());
     $("settings-back").addEventListener("click", () => this.close("settings"));
     $("logout").addEventListener("click", () => void this.logout());
@@ -168,7 +174,7 @@ export class App {
     if (!this.overlays.includes(o)) {
       const active = document.activeElement;
       // Safari does not focus buttons on tap, so fall back to the control that opens this overlay.
-      const opener = document.getElementById(o === "sheet" ? "sheet-button" : "menu-button");
+      const opener = document.getElementById(o === "sheet" ? "sheet-button" : o === "dialog" ? "input" : "menu-button");
       this.returnFocus.set(o, active instanceof HTMLElement && active !== document.body ? active : opener);
       this.overlays.push(o);
     }
@@ -225,6 +231,8 @@ export class App {
     const sidebarOpen = this.overlays.includes("sidebar");
     const sheetOpen = this.overlays.includes("sheet");
     const settingsOpen = this.overlays.includes("settings");
+    const dialogOpen = this.overlays.includes("dialog");
+    $("dialog").dataset.open = String(dialogOpen);
     const sidebar = $("sidebar");
     sidebar.dataset.open = String(sidebarOpen);
     if (sidebarOpen) {
@@ -238,12 +246,12 @@ export class App {
     $("sheet").dataset.open = String(sheetOpen);
     $("sheet-button").setAttribute("aria-expanded", String(sheetOpen));
     $("settings").hidden = !settingsOpen;
-    $("scrim").hidden = !(sheetOpen || sidebarOpen);
-    $("scrim").dataset.for = sheetOpen ? "sheet" : "sidebar";
+    $("scrim").hidden = !(sheetOpen || sidebarOpen || dialogOpen);
+    $("scrim").dataset.for = sheetOpen || dialogOpen ? "sheet" : "sidebar";
   }
 
   private overlayElement(o: Overlay): HTMLElement {
-    return $(o === "sheet" ? "sheet" : o === "sidebar" ? "sidebar" : "settings");
+    return $(o);
   }
 
   /** Keep Tab inside the topmost overlay. */
@@ -262,6 +270,37 @@ export class App {
       e.preventDefault();
       first.focus();
     }
+  }
+
+  // ---- extension dialogs ----------------------------------------------
+
+  /** Opens the sheet for a newly arrived dialog and closes it once the dialog is answered anywhere. */
+  syncDialog(): void {
+    const d = this.dialogs.current;
+    $("dialog-reopen").hidden = d === null;
+    if (d === null) {
+      this.shownDialog = null;
+      this.close("dialog");
+      return;
+    }
+    if (d !== this.shownDialog) this.showDialog();
+  }
+
+  showDialog(): void {
+    const d = this.dialogs.current;
+    if (!d) return;
+    this.shownDialog = d;
+    const { title, body } = renderDialog(d, (a) => void this.answerDialog(a));
+    $("dialog-title").textContent = title;
+    $("dialog-body").replaceChildren(body);
+    const first = body.querySelector<HTMLElement>("input, textarea, button");
+    if (first) first.id ||= "dialog-first";
+    this.open("dialog", first?.id ?? "dialog-close");
+  }
+
+  async answerDialog(a: DialogAnswer): Promise<void> {
+    const r = await this.conn.command(a);
+    if (!r.success) this.notice("error", `answer not delivered: ${r.error ?? "unknown error"}`);
   }
 
   // ---- settings -------------------------------------------------------
@@ -308,6 +347,7 @@ export class App {
         if (this.resetting) this.resetBuffer.push(f.event);
         else {
           applyEvent(this.t, f.event);
+          if (this.dialogs.apply(f.event)) this.syncDialog();
           if (f.event.type === "thinking_level_changed" && typeof f.event.level === "string") {
             this.thinkingLevel = f.event.level;
             this.renderHeader();
@@ -328,6 +368,8 @@ export class App {
 
   attach(id: string): void {
     if (id !== this.conn.sessionId) {
+      this.dialogs.clear();
+      this.syncDialog();
       this.t = emptyTranscript();
       this.view.clear();
       this.model = null;

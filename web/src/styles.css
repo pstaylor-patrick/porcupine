@@ -297,3 +297,24 @@ details > :not(summary) { padding: 0 12px 10px; }
   .model-list { max-height: 50dvh; }
   .composer { padding-left: max(var(--gutter), calc((100% - 900px) / 2 + var(--gutter))); padding-right: max(var(--gutter), calc((100% - 900px) / 2 + var(--gutter))); }
 }
+
+/* Extension dialogs and ask_user_question. */
+.dialog-reopen { margin: 0 var(--gutter) 8px; min-height: 44px; border-radius: 10px; border: 1px solid var(--accent); background: var(--user); color: var(--accent); font-weight: 600; cursor: pointer; }
+.dialog-form { display: flex; flex-direction: column; gap: 16px; }
+.dialog-message { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dialog-options { display: flex; flex-direction: column; gap: 8px; }
+.dialog-option { min-height: 44px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; overflow-wrap: anywhere; }
+.dialog-text, .other-text { font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: inherit; }
+.dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.dialog-actions button { min-height: 44px; padding: 0 18px; border-radius: 10px; font-weight: 600; }
+.dialog-actions .primary { border: 0; cursor: pointer; }
+.dialog-actions .primary:disabled { opacity: 0.5; cursor: default; }
+.question { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.question legend { font-weight: 600; padding: 0; margin-bottom: 8px; overflow-wrap: anywhere; }
+.chip { display: inline-block; font-size: 0.75em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); background: var(--user); border-radius: 999px; padding: 2px 8px; margin-right: 8px; vertical-align: middle; }
+.choice { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--accent); background: var(--user); }
+.choice input[type="radio"], .choice input[type="checkbox"] { width: 20px; height: 20px; margin: 2px 0 0; flex: none; }
+.choice-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.choice-desc { font-size: 0.85em; color: var(--muted); overflow-wrap: anywhere; }
+.choice .other-text { width: 100%; box-sizing: border-box; padding: 6px 8px; }

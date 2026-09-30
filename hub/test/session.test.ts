@@ -182,11 +182,13 @@ describe("porcupine session", () => {
     c2.close();
   });
 
-  it("auto-cancels extension UI dialogs and surfaces a notice", async () => {
+  it("auto-cancels extension UI dialogs when no browser is attached", async () => {
     const s = await start();
     const c = await Client.open(s.paths.sock);
-    c.send({ t: "hello", proto: 1, since: null });
+    // No hello: this socket can send commands but is not attached to events.
     c.send({ t: "cmd", cid: "u", cmd: { type: "prompt", message: "__ui__", images: [] } });
+    await c.until((f) => f.t === "result" && f.cid === "u");
+    c.send({ t: "hello", proto: 1, since: null });
     const notice = await c.until((f) => f.t === "event" && f.event.type === "porcupine_notice");
     expect(notice.t === "event" && notice.event.text).toBe("extension UI confirm auto-cancelled: Allow?");
     const answer = await c.until((f) => f.t === "event" && f.event.type === "fake_ui_answer");
@@ -195,8 +197,34 @@ describe("porcupine session", () => {
       id: "ui-1",
       cancelled: true,
     });
-    await c.until((f) => f.t === "result" && f.cid === "u");
     expect(logs.some((l) => l.includes("auto-cancelled"))).toBe(true);
+    c.close();
+  });
+
+  it("forwards dialogs to an attached browser and relays its answer", async () => {
+    const s = await start();
+    const c = await Client.open(s.paths.sock);
+    c.send({ t: "hello", proto: 1, since: null });
+    await c.until((f) => f.t === "welcome");
+    c.send({ t: "cmd", cid: "u", cmd: { type: "prompt", message: "__ui__", images: [] } });
+    const req = await c.until((f) => f.t === "event" && f.event.type === "extension_ui_request");
+    expect(req.t === "event" && req.event.id).toBe("ui-1");
+
+    c.send({ t: "cmd", cid: "bad", cmd: { type: "extension_ui_response", id: "ui-9", confirmed: true } });
+    const bad = await c.until((f) => f.t === "result" && f.cid === "bad");
+    expect(bad.t === "result" && bad.response.success).toBe(false);
+
+    c.send({ t: "cmd", cid: "a", cmd: { type: "extension_ui_response", id: "ui-1", confirmed: true, extra: "x" } });
+    const ok = await c.until((f) => f.t === "result" && f.cid === "a");
+    expect(ok.t === "result" && ok.response.success).toBe(true);
+    const resolved = await c.until((f) => f.t === "event" && f.event.type === "porcupine_ui_resolved");
+    expect(resolved.t === "event" && resolved.event.id).toBe("ui-1");
+    const answer = await c.until((f) => f.t === "event" && f.event.type === "fake_ui_answer");
+    expect(answer.t === "event" && answer.event.response).toStrictEqual({
+      type: "extension_ui_response",
+      id: "ui-1",
+      confirmed: true,
+    });
     c.close();
   });
 
