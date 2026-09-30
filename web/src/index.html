@@ -12,8 +12,9 @@
     <meta name="apple-mobile-web-app-title" content="Porcupine" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
-    <script src="/theme-init.js"></script>
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+        <script src="/theme-init.js"></script>
     <link rel="stylesheet" href="/styles.css" />
     <script type="module" src="/app.js"></script>
   </head>
@@ -33,6 +34,7 @@
         <button id="menu-button" type="button" class="icon-button" aria-label="Sessions" aria-controls="sidebar" aria-expanded="false">
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
         </button>
+        <svg class="brand-logo" aria-hidden="true" focusable="false" viewBox="100 220 870 590" fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"><path d="M330 425L462 265M405 440L610 252M455 485L745 295M495 525L885 365M530 572L940 458M570 612L910 552M335 420C290 400 240 415 200 445C155 480 120 530 142 572C185 588 250 578 300 545M142 572L228 578L182 630C240 680 400 718 520 714C580 710 600 690 612 678C690 655 780 645 858 642M262 520C250 490 275 470 290 488C300 505 285 530 262 520M232 690L226 760L292 762L302 712M425 715L425 785L505 785L515 700M466 735L466 782"/></svg>
         <h1 id="session-title" class="session-title">Porcupine</h1>
         <svg class="crayon crayon-stream" viewBox="0 0 120 12" aria-hidden="true" focusable="false"><path pathLength="1" d="M2 7C18 2 30 11 46 6S74 2 88 7S110 9 118 4"/></svg>
         <span id="conn-dot" class="conn-dot" role="img" aria-label="Disconnected"></span>

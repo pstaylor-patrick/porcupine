@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.png" width="128" alt="Porcupine logo"></p>
+
 # Porcupine
 
 A small, mobile-first PWA for driving [pi](https://github.com/earendil-works/pi)

@@ -97,6 +97,13 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fo
   background: var(--panel);
   min-width: 0;
 }
+.brand-logo {
+  flex: none;
+  width: 36px;
+  height: auto;
+  color: var(--crayon);
+  pointer-events: none;
+}
 .session-title {
   flex: 1 1 auto;
   min-width: 0;

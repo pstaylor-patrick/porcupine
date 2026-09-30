@@ -49,10 +49,11 @@ cpSync("src/crayon", "dist/crayon", { recursive: true });
 const crayon = readdirSync("src/crayon").filter((f) => f.endsWith(".svg")).map((f) => `/crayon/${f}`);
 const fonts = readdirSync("src/fonts").filter((f) => f.endsWith(".woff2")).map((f) => `/fonts/${f}`);
 cpSync("src/manifest.webmanifest", "dist/manifest.webmanifest");
-for (const f of ["icon-192.png", "icon-512.png", "maskable-512.png"]) copyFileSync(`src/icons/${f}`, `dist/icons/${f}`);
+for (const f of ["icon-192.png", "icon-512.png", "maskable-512.png", "favicon-32.png"]) copyFileSync(`src/icons/${f}`, `dist/icons/${f}`);
 copyFileSync("src/icons/apple-touch-icon-180.png", "dist/apple-touch-icon.png");
+copyFileSync("src/favicon.ico", "dist/favicon.ico");
 
-const shell = ["/", `/${jsName}`, `/${cssName}`, "/theme-init.js", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/apple-touch-icon.png", ...fonts, ...crayon];
+const shell = ["/", `/${jsName}`, `/${cssName}`, "/theme-init.js", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/apple-touch-icon.png", "/icons/favicon-32.png", "/favicon.ico", ...fonts, ...crayon];
 await build({
   entryPoints: ["src/sw.ts"],
   bundle: true,
