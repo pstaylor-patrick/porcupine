@@ -267,6 +267,34 @@ describe("app", () => {
     await vi.waitFor(() => expect(byId("model-current").textContent).toBe("vercel-ai-gateway/openai/gpt-5"));
   });
 
+  it("shows distinct model sheet states", async () => {
+    const { app, conn } = setup({ get_available_models: { success: true, data: { models: [] } } });
+    app.openSheet();
+    expect(byId("model-state").textContent).toBe("Not attached: pick a session");
+    conn.sessionId = "s1";
+    const p = app.loadModels();
+    expect(byId("model-state").textContent).toBe("Loading models");
+    await p;
+    expect(byId("model-state").textContent).toBe("No models available (check the provider key)");
+  });
+
+  it("renders a model load error in the sheet and the transcript", async () => {
+    const { app, conn } = setup({ get_available_models: { success: false, error: "boom" } });
+    conn.sessionId = "s1";
+    await app.loadModels();
+    expect(byId("model-state").textContent).toContain("boom");
+    expect(app.modelsError).toBe("boom");
+  });
+
+  it("disables the thinking select when the model has no reasoning", async () => {
+    const { app, conn } = setup({ get_state: { success: true, data: { model: { id: "m", provider: "p", reasoning: false }, thinkingLevel: "low" } } });
+    conn.sessionId = "s1";
+    await app.refreshState();
+    const select = byId("thinking-select") as HTMLSelectElement;
+    expect(select.disabled).toBe(true);
+    expect(select.value).toBe("off");
+  });
+
   it("uses the steer toggle from the sheet for prompts sent while streaming", async () => {
     const { app, conn, sent } = setup({});
     conn.sessionId = "s1";

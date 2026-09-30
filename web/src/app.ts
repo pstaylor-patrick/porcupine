@@ -2,6 +2,7 @@
 import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
 import { TranscriptView } from "./render.js";
 import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./transcript.js";
+import { filterModels, parseModel, sheetState, type ModelInfo, type SheetState } from "./models.js";
 import { Connection, type PiResponse, type ServerFrame, type SessionInfo } from "./ws.js";
 
 export function appTitle(): string {
@@ -52,22 +53,13 @@ export function buildPrompt(message: string, streaming: boolean, behavior: Strea
   return cmd;
 }
 
-export interface ModelInfo {
-  id: string;
-  name?: string;
-  provider: string;
-  reasoning?: boolean;
-}
+export { filterModels, type ModelInfo } from "./models.js";
 
-export function filterModels(models: ModelInfo[], query: string): ModelInfo[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return models;
-  const terms = q.split(/\s+/);
-  return models.filter((m) => {
-    const hay = `${m.provider}/${m.id} ${m.name ?? ""}`.toLowerCase();
-    return terms.every((t) => hay.includes(t));
-  });
-}
+const SHEET_MESSAGES: Record<Exclude<SheetState, "ready" | "error">, string> = {
+  detached: "Not attached: pick a session",
+  loading: "Loading models",
+  empty: "No models available (check the provider key)",
+};
 
 function $(id: string): HTMLElement {
   const node = document.getElementById(id);
@@ -95,7 +87,12 @@ export class App {
   /** The dialog shown in the sheet; hiding the sheet keeps it pending. */
   private shownDialog: Dialog | null = null;
   private readonly returnFocus = new Map<Overlay, HTMLElement | null>();
-  private modelsLoading: Promise<void> | null = null;
+  private modelsRequest: Promise<void> | null = null;
+  /** Session the in-flight model request was sent for; a response for another session is dropped. */
+  private modelsFor: string | null = null;
+  private modelsSeq = 0;
+  modelsLoading = false;
+  modelsError: string | null = null;
   private resetting = false;
   private resetBuffer: Record<string, unknown>[] = [];
   private renderQueued = false;
@@ -374,6 +371,7 @@ export class App {
       this.view.clear();
       this.model = null;
     }
+    this.resetModels();
     this.conn.attach(id);
     this.renderSessions();
     this.renderHeader();
@@ -390,6 +388,8 @@ export class App {
   private sessionGone(): void {
     this.notice("warn", "session ended");
     this.conn.detach();
+    this.resetModels();
+    this.renderModels();
     this.renderSessions();
   }
 
@@ -419,7 +419,7 @@ export class App {
     const r = await this.conn.command({ type: "get_state" });
     if (!r.success || !isRec(r.data)) return;
     const d = r.data;
-    if (isRec(d.model) && typeof d.model.id === "string") this.model = d.model as unknown as ModelInfo;
+    if ("model" in d) this.model = parseModel(d.model);
     if (typeof d.thinkingLevel === "string") this.thinkingLevel = d.thinkingLevel;
     if (typeof d.isStreaming === "boolean") this.t.isStreaming = d.isStreaming;
     this.renderHeader();
@@ -458,7 +458,7 @@ export class App {
 
   async setModel(m: ModelInfo): Promise<void> {
     const r = await this.conn.command({ type: "set_model", provider: m.provider, modelId: m.id });
-    if (r.success) this.model = isRec(r.data) && typeof r.data.id === "string" ? (r.data as unknown as ModelInfo) : m;
+    if (r.success) this.model = parseModel(r.data) ?? m;
     else this.notice("error", `set model: ${r.error ?? "failed"}`);
     this.renderHeader();
     this.renderModels();
@@ -483,28 +483,60 @@ export class App {
     this.queueRender();
   }
 
+  private resetModels(): void {
+    this.models = [];
+    this.modelsError = null;
+    this.modelsLoading = false;
+    this.modelsRequest = null;
+    this.modelsFor = null;
+    this.modelsSeq++;
+  }
+
   loadModels(): Promise<void> {
-    if (this.models.length > 0 || !this.conn.sessionId) {
+    const sid = this.conn.sessionId;
+    if (this.models.length > 0 || !sid) {
       this.renderModels();
       return Promise.resolve();
     }
-    this.modelsLoading ??= (async () => {
+    if (this.modelsRequest && this.modelsFor === sid) return this.modelsRequest;
+    this.modelsFor = sid;
+    this.modelsLoading = true;
+    this.modelsError = null;
+    this.renderModels();
+    const seq = ++this.modelsSeq;
+    const req = (async () => {
       const r = await this.conn.command({ type: "get_available_models" });
+      if (seq !== this.modelsSeq || this.conn.sessionId !== sid) return;
       if (r.success && isRec(r.data) && Array.isArray(r.data.models)) {
-        this.models = (r.data.models as unknown[]).filter(
-          (m): m is ModelInfo => isRec(m) && typeof m.id === "string" && typeof m.provider === "string",
-        );
-      } else this.notice("error", `models: ${r.error ?? "failed"}`);
-      this.modelsLoading = null;
+        this.models = r.data.models.map(parseModel).filter((m): m is ModelInfo => m !== null);
+      } else {
+        this.modelsError = r.error ?? "failed";
+        this.notice("error", `models: ${this.modelsError}`);
+      }
+      this.modelsLoading = false;
+      this.modelsRequest = null;
       this.renderModels();
     })();
-    return this.modelsLoading;
+    this.modelsRequest = req;
+    return req;
   }
 
   // ---- rendering ------------------------------------------------------
 
   renderModels(): void {
     const list = $("model-list");
+    const status = $("model-state");
+    const state = sheetState({
+      attached: this.conn.sessionId !== null,
+      loading: this.modelsLoading,
+      error: this.modelsError,
+      models: this.models,
+    });
+    status.hidden = state === "ready";
+    status.dataset.state = state;
+    if (state === "error") status.textContent = `Could not load models: ${this.modelsError ?? "failed"}`;
+    else if (state !== "ready") status.textContent = SHEET_MESSAGES[state];
+    else status.textContent = "";
     const q = ($("model-filter") as HTMLInputElement).value;
     const shown = filterModels(this.models, q).slice(0, 200);
     list.replaceChildren(
@@ -526,7 +558,10 @@ export class App {
 
   renderHeader(): void {
     $("model-current").textContent = this.model ? `${this.model.provider}/${this.model.id}` : "No model";
-    ($("thinking-select") as HTMLSelectElement).value = this.thinkingLevel;
+    const thinking = $("thinking-select") as HTMLSelectElement;
+    const noReasoning = this.model?.reasoning === false;
+    thinking.disabled = noReasoning;
+    thinking.value = noReasoning ? "off" : this.thinkingLevel;
     const s = this.sessions.find((x) => x.id === this.conn.sessionId);
     const title = $("session-title");
     title.textContent = s ? s.name : "Porcupine";
