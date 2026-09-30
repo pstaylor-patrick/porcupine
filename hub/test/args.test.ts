@@ -122,7 +122,7 @@ describe("resolveDefaults", () => {
   });
   it("routes a PORCUPINE_MODEL override", () => {
     expect(resolveDefaults({ PORCUPINE_MODEL: "x/y" })).toEqual({ provider: "openrouter", model: "x/y" });
-    expect(resolveDefaults({ PORCUPINE_MODEL: "openai/gpt-5" })).toEqual({ provider: "openrouter", model: "openai/gpt-5" });
+    expect(resolveDefaults({ PORCUPINE_MODEL: "openai/gpt-5" })).toEqual({ provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL });
     expect(resolveDefaults({ PORCUPINE_MODEL: "openai/gpt-5", OPENAI_API_KEY: "sk-test" })).toEqual({
       provider: "openai",
       model: "gpt-5",

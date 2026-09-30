@@ -5,7 +5,8 @@ import { routeProvider, vendorOfId } from "./routing.js";
 
 /** Default model on OpenRouter, and the same model on the Anthropic API when keyed. */
 export const DEFAULT_PROVIDER = "openrouter";
-export const DEFAULT_MODEL = "anthropic/claude-opus-5.5";
+/** OpenRouter default while no Anthropic key is set. */
+export const DEFAULT_MODEL = "deepseek/deepseek-v4-pro";
 export const DIRECT_ANTHROPIC_MODEL = "claude-opus-5-5";
 export const DEFAULT_THINKING = "low";
 
@@ -60,8 +61,10 @@ export function resolveDefaults(env: NodeJS.ProcessEnv): PiDefaults {
   if (env.PORCUPINE_MODEL) {
     const vendor = vendorOfId(env.PORCUPINE_MODEL);
     const provider = routeProvider(vendor, env);
-    const model = provider === "openrouter" ? env.PORCUPINE_MODEL : env.PORCUPINE_MODEL.slice(vendor.length + 1);
-    return { provider, model };
+    if (provider) {
+      const model = provider === "openrouter" ? env.PORCUPINE_MODEL : env.PORCUPINE_MODEL.slice(vendor.length + 1);
+      return { provider, model };
+    }
   }
   if (routeProvider("anthropic", env) === "anthropic") return { provider: "anthropic", model: DIRECT_ANTHROPIC_MODEL };
   return { provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL };

@@ -100,7 +100,7 @@ describe("porcupine session", () => {
     const envFile = join(tmpdir(), `fake-env-${process.pid}.json`);
     await start({ FAKE_PI_ARGS_FILE: argsFile, FAKE_PI_ENV_FILE: envFile, PORCUPINE_RPC_PASSWORD: "hunter2" });
     const args = JSON.parse(readFileSync(argsFile, "utf8"));
-    expect(args).toEqual(["--mode", "rpc", "--provider", "openrouter", "--model", "anthropic/claude-opus-5.5", "--thinking", "low"]);
+    expect(args).toEqual(["--mode", "rpc", "--provider", "openrouter", "--model", "deepseek/deepseek-v4-pro", "--thinking", "low"]);
     const env = JSON.parse(readFileSync(envFile, "utf8")) as Record<string, string>;
     expect(env.OPENROUTER_API_KEY).toBe("sk-or-test");
     expect(env.AI_GATEWAY_API_KEY).toBeUndefined();
@@ -144,7 +144,6 @@ describe("porcupine session", () => {
     const v = await c.until((f) => f.t === "result" && f.cid === "v");
     const k = await c.until((f) => f.t === "result" && f.cid === "k");
     expect(m.t === "result" && (m.response.data as { models: unknown[] }).models).toEqual([
-      { provider: "openrouter", id: "anthropic/claude-opus-5.5" },
       { provider: "openrouter", id: "moonshotai/kimi-k3" },
     ]);
     expect(v.t === "result" && v.response).toEqual({

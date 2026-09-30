@@ -1,9 +1,9 @@
 import type { PiCommand, PiResponse } from "../shared/protocol.js";
 
 /**
- * Each model has exactly one provider: Anthropic models come from the Anthropic API and
- * OpenAI models from the OpenAI API when their keys are set; everything else, and those
- * vendors while their key is missing, comes from OpenRouter. No other provider is used.
+ * Each model has exactly one provider: Anthropic models come only from the Anthropic API and
+ * OpenAI models only from the OpenAI API, and are hidden while their key is missing. Every
+ * other vendor comes from OpenRouter. No other provider is used.
  */
 const DIRECT: Readonly<Record<string, string>> = {
   anthropic: "ANTHROPIC_API_KEY",
@@ -15,10 +15,11 @@ export interface ModelRef {
   id: string;
 }
 
-/** The provider that serves `vendor`'s models. */
-export function routeProvider(vendor: string, env: NodeJS.ProcessEnv): string {
+/** The provider that serves `vendor`'s models, or null for a direct vendor whose key is missing. */
+export function routeProvider(vendor: string, env: NodeJS.ProcessEnv): string | null {
   const key = DIRECT[vendor];
-  return key && env[key] ? vendor : "openrouter";
+  if (!key) return "openrouter";
+  return env[key] ? vendor : null;
 }
 
 /** Vendor of a model id: the prefix before the first slash, or "" without one. */

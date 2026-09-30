@@ -33,7 +33,7 @@ phone / laptop ──HTTPS──> reverse proxy ──> porcupine-hub ──unix
 - HTTPS in front of the hub. Service workers and `Secure` cookies need it;
   [examples/Caddyfile](examples/Caddyfile) shows one way.
 - An OpenRouter API key. Anthropic and OpenAI keys are optional. The default model is
-  Claude Opus 5.5 with low thinking.
+  Claude Opus 5.5 when `ANTHROPIC_API_KEY` is set, else DeepSeek V4 Pro, with low thinking.
 
 ## Install
 
@@ -64,14 +64,13 @@ Settings come from the process environment or the env file
 | `OPENROUTER_API_KEY` | required | OpenRouter key; serves every model not routed direct |
 | `ANTHROPIC_API_KEY` | | Optional; serves Anthropic models from the Anthropic API |
 | `OPENAI_API_KEY` | | Optional; serves OpenAI models from the OpenAI API |
-| `PORCUPINE_MODEL` | `anthropic/claude-opus-5.5` | Default model for new sessions, as an OpenRouter-style `vendor/model` id; routed like any other |
+| `PORCUPINE_MODEL` | see above | Default model for new sessions, as an OpenRouter-style `vendor/model` id; routed like any other |
 | `PORCUPINE_RUNTIME_DIR` | `$XDG_RUNTIME_DIR/porcupine` | Session sockets |
 
-Each model comes from exactly one provider. Anthropic models come from the
-Anthropic API when `ANTHROPIC_API_KEY` is set, and OpenAI models from the OpenAI
-API when `OPENAI_API_KEY` is set; everything else, and those two vendors while
-their key is missing, comes from OpenRouter. The model list hides every other
-copy, so adding a direct key moves that vendor's models off OpenRouter.
+Each model comes from exactly one provider. Anthropic models come only from the
+Anthropic API and OpenAI models only from the OpenAI API; without their key they
+are hidden, never served through OpenRouter. Every other vendor comes from
+OpenRouter.
 
 ## Run
 

@@ -5,9 +5,9 @@ const NONE = { OPENROUTER_API_KEY: "sk-or-test", AI_GATEWAY_API_KEY: "vk" };
 const BOTH = { ...NONE, ANTHROPIC_API_KEY: "ak", OPENAI_API_KEY: "sk-test" };
 
 describe("routeProvider", () => {
-  it("routes everything to OpenRouter without direct keys", () => {
-    expect(routeProvider("anthropic", NONE)).toBe("openrouter");
-    expect(routeProvider("openai", NONE)).toBe("openrouter");
+  it("never routes Anthropic or OpenAI through OpenRouter", () => {
+    expect(routeProvider("anthropic", NONE)).toBeNull();
+    expect(routeProvider("openai", NONE)).toBeNull();
     expect(routeProvider("google", NONE)).toBe("openrouter");
   });
   it("routes Anthropic and OpenAI direct when keyed", () => {
@@ -26,9 +26,10 @@ describe("vendorOfId", () => {
 });
 
 describe("allowedModel", () => {
-  it("keeps only OpenRouter without direct keys", () => {
-    expect(allowedModel({ provider: "openrouter", id: "anthropic/claude-opus-5.5" }, NONE)).toBe(true);
-    expect(allowedModel({ provider: "openrouter", id: "openai/gpt-oss-120b" }, NONE)).toBe(true);
+  it("hides Anthropic and OpenAI models without direct keys", () => {
+    expect(allowedModel({ provider: "openrouter", id: "anthropic/claude-opus-5.5" }, NONE)).toBe(false);
+    expect(allowedModel({ provider: "openrouter", id: "openai/gpt-oss-120b" }, NONE)).toBe(false);
+    expect(allowedModel({ provider: "openrouter", id: "deepseek/deepseek-v4-pro" }, NONE)).toBe(true);
     expect(allowedModel({ provider: "anthropic", id: "claude-opus-5-5" }, NONE)).toBe(false);
     expect(allowedModel({ provider: "openai", id: "gpt-5" }, NONE)).toBe(false);
   });
@@ -76,7 +77,8 @@ describe("filterModelsResponse", () => {
 
 describe("rejectSetModel", () => {
   it("rejects unrouted models and ignores other commands", () => {
-    expect(rejectSetModel({ type: "set_model", provider: "openrouter", modelId: "openai/gpt-5" }, NONE)).toBeNull();
+    expect(rejectSetModel({ type: "set_model", provider: "openrouter", modelId: "openai/gpt-5" }, NONE)?.success).toBe(false);
+    expect(rejectSetModel({ type: "set_model", provider: "openrouter", modelId: "google/gemini-3-pro" }, NONE)).toBeNull();
     expect(rejectSetModel({ type: "set_model", provider: "openrouter", modelId: "openai/gpt-5" }, BOTH)).toEqual({
       success: false,
       error: "model not available: openrouter/openai/gpt-5",
