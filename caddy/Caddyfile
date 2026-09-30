@@ -1,0 +1,13 @@
+{
+	email patrickt@servant.io
+	admin off
+}
+
+porcupine.example.com {
+	bind {$PORCUPINE_TAILNET_IP}
+	tls {
+		dns route53
+	}
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy 127.0.0.1:8787
+}
