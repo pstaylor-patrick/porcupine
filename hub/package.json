@@ -3,13 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "porcupine": { "piVersion": "0.99.1" },
+  "porcupine": {
+    "piVersion": "0.99.1"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && chmod +x dist/cli/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "devDependencies": {
     "@types/node": "^22.10.0"
+  },
+  "bin": {
+    "porcupine": "dist/cli/main.js"
   }
 }
