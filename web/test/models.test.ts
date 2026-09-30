@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  CAPABILITIES,
+  CHEAP_INPUT_MAX,
   filterModels,
+  hasCapability,
+  LONG_CONTEXT_MIN,
   formatContext,
   formatPrice,
   groupByVendor,
@@ -13,6 +17,7 @@ import {
   rowDetail,
   sheetState,
   vendorOf,
+  type Capability,
   type ModelInfo,
   type RecentStorage,
 } from "../src/models.js";
@@ -180,5 +185,65 @@ describe("recent models", () => {
     };
     expect(loadRecent(s)).toEqual([RECENT_SEED]);
     expect(pushRecent(s, "a/1")).toEqual(["a/1", RECENT_SEED]);
+  });
+});
+
+describe("capability filters", () => {
+  const base: ModelInfo = { id: "v/base", provider: "p" };
+  const think: ModelInfo = { id: "v/think", provider: "p", reasoning: true, input: ["text"] };
+  const vision: ModelInfo = { id: "v/vision", provider: "p", input: ["text", "image"] };
+  const both: ModelInfo = { id: "v/both", provider: "p", reasoning: true, input: ["text", "image"], contextWindow: 400_000 };
+
+  it("exports the four capabilities and thresholds", () => {
+    expect(CAPABILITIES.map((c) => c.key)).toEqual(["thinking", "images", "long", "cheap"]);
+    expect(LONG_CONTEXT_MIN).toBe(400_000);
+    expect(CHEAP_INPUT_MAX).toBe(0.5);
+  });
+
+  it("thinking and images", () => {
+    expect(hasCapability(think, "thinking")).toBe(true);
+    expect(hasCapability(base, "thinking")).toBe(false);
+    expect(hasCapability({ ...base, reasoning: false }, "thinking")).toBe(false);
+    expect(hasCapability(vision, "images")).toBe(true);
+    expect(hasCapability(think, "images")).toBe(false);
+    expect(hasCapability(base, "images")).toBe(false);
+  });
+
+  it("long context is inclusive at 400K", () => {
+    expect(hasCapability({ ...base, contextWindow: 400_000 }, "long")).toBe(true);
+    expect(hasCapability({ ...base, contextWindow: 399_999 }, "long")).toBe(false);
+    expect(hasCapability(base, "long")).toBe(false);
+  });
+
+  it("cheap is inclusive at 0.5; missing or zero input cost is not cheap", () => {
+    expect(hasCapability({ ...base, cost: { input: 0.5, output: 1 } }, "cheap")).toBe(true);
+    expect(hasCapability({ ...base, cost: { input: 0.51, output: 1 } }, "cheap")).toBe(false);
+    expect(hasCapability({ ...base, cost: { input: 0, output: 0 } }, "cheap")).toBe(false);
+    expect(hasCapability({ ...base, cost: { output: 1 } }, "cheap")).toBe(false);
+    expect(hasCapability(base, "cheap")).toBe(false);
+  });
+
+  const all = [base, think, vision, both];
+  const ids = (ms: ModelInfo[]) => ms.map((m) => m.id);
+
+  it("ANDs selected capabilities", () => {
+    expect(ids(filterModels(all, "", new Set<Capability>(["thinking"])))).toEqual(["v/think", "v/both"]);
+    expect(ids(filterModels(all, "", new Set<Capability>(["thinking", "images"])))).toEqual(["v/both"]);
+  });
+
+  it("combines capabilities with text", () => {
+    expect(ids(filterModels(all, "v/think", new Set<Capability>(["thinking"])))).toEqual(["v/think"]);
+    expect(filterModels(all, "vision", new Set<Capability>(["thinking"]))).toEqual([]);
+  });
+
+  it("matches typed capability words", () => {
+    expect(ids(filterModels(all, "thinking"))).toEqual(["v/think", "v/both"]);
+    expect(ids(filterModels(all, "images"))).toEqual(["v/vision", "v/both"]);
+    expect(ids(filterModels(all, "thinking images"))).toEqual(["v/both"]);
+  });
+
+  it("returns the same array for empty query and empty set", () => {
+    expect(filterModels(all, "")).toBe(all);
+    expect(filterModels(all, "  ", new Set())).toBe(all);
   });
 });

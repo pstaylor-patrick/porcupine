@@ -43,12 +43,47 @@ export function parseModel(raw: unknown): ModelInfo | null {
   return m;
 }
 
-export function filterModels(models: ModelInfo[], query: string): ModelInfo[] {
+export type Capability = "thinking" | "images" | "long" | "cheap";
+
+export const CAPABILITIES: readonly { key: Capability; label: string }[] = [
+  { key: "thinking", label: "Thinking" },
+  { key: "images", label: "Images" },
+  { key: "long", label: "Long context" },
+  { key: "cheap", label: "Cheap" },
+];
+
+/** Tokens, inclusive. */
+export const LONG_CONTEXT_MIN = 400_000;
+/** Dollars per million input tokens, inclusive. A missing or zero price is unknown, not cheap. */
+export const CHEAP_INPUT_MAX = 0.5;
+
+export function hasCapability(m: ModelInfo, c: Capability): boolean {
+  switch (c) {
+    case "thinking":
+      return m.reasoning === true;
+    case "images":
+      return m.input?.includes("image") === true;
+    case "long":
+      return (m.contextWindow ?? 0) >= LONG_CONTEXT_MIN;
+    case "cheap": {
+      const i = m.cost?.input;
+      return i !== undefined && i > 0 && i <= CHEAP_INPUT_MAX;
+    }
+  }
+}
+
+/** Keeps models that have every selected capability and match every query term. */
+export function filterModels(models: ModelInfo[], query: string, caps: ReadonlySet<Capability> = new Set()): ModelInfo[] {
   const q = query.trim().toLowerCase();
-  if (!q) return models;
-  const terms = q.split(/\s+/);
+  if (!q && caps.size === 0) return models;
+  const terms = q ? q.split(/\s+/) : [];
   return models.filter((m) => {
-    const hay = `${m.provider}/${m.id} ${m.name ?? ""}`.toLowerCase();
+    for (const c of caps) if (!hasCapability(m, c)) return false;
+    if (terms.length === 0) return true;
+    const words = [`${m.provider}/${m.id}`, m.name ?? ""];
+    if (hasCapability(m, "thinking")) words.push("thinking");
+    if (hasCapability(m, "images")) words.push("images");
+    const hay = words.join(" ").toLowerCase();
     return terms.every((t) => hay.includes(t));
   });
 }
