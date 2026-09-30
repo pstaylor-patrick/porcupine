@@ -12,7 +12,21 @@ export interface ComposerActions {
   abort(): void;
 }
 
-/** Enter sends, Shift+Enter inserts a newline, Esc aborts. Returns true when the key was handled. */
+/** Overlays close in this order on Esc: the topmost one wins. */
+export type Overlay = "sheet" | "sidebar" | "settings";
+
+export function basename(path: string): string {
+  const trimmed = path.replace(/\/+$/, "");
+  const i = trimmed.lastIndexOf("/");
+  return i >= 0 ? trimmed.slice(i + 1) || "/" : trimmed;
+}
+
+declare const __APP_VERSION__: string | undefined;
+export const APP_VERSION: string = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
+
+const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
+
+/** Enter sends, Shift+Enter inserts a newline, Esc aborts (open overlays take Esc first, see App.bind). Returns true when the key was handled. */
 export function handleComposerKey(e: KeyboardEvent, actions: ComposerActions): boolean {
   if (e.isComposing) return false;
   if (e.key === "Escape") {
@@ -70,6 +84,14 @@ export class App {
   models: ModelInfo[] = [];
   model: ModelInfo | null = null;
   thinkingLevel = "off";
+  connState: "connecting" | "open" | "closed" = "closed";
+  /** Open overlays, bottom to top. */
+  readonly overlays: Overlay[] = [];
+  /** Wide layout: sidebar docked, sheet as a right panel. Overridable for tests. */
+  isDesktop: () => boolean = () => typeof window.matchMedia === "function" && window.matchMedia("(min-width: 900px)").matches;
+  navigate: (url: string) => void = (url) => location.assign(url);
+  private readonly returnFocus = new Map<Overlay, HTMLElement | null>();
+  private modelsLoading: Promise<void> | null = null;
   private resetting = false;
   private resetBuffer: Record<string, unknown>[] = [];
   private renderQueued = false;
@@ -85,9 +107,12 @@ export class App {
     return {
       onFrame: (f: ServerFrame) => this.onFrame(f),
       onStatus: (s: "connecting" | "open" | "closed") => {
+        this.connState = s;
+        const label = s === "open" ? "Connected" : s === "connecting" ? "Connecting" : "Disconnected";
         const dot = $("conn-dot");
         dot.dataset.state = s;
-        dot.setAttribute("aria-label", s === "open" ? "Connected" : s === "connecting" ? "Connecting" : "Disconnected");
+        dot.setAttribute("aria-label", label);
+        $("settings-conn").textContent = label;
       },
     };
   }
@@ -98,6 +123,18 @@ export class App {
       e.preventDefault();
       void this.send();
     });
+    // Capture phase: an open overlay swallows Esc before the composer can turn it into an abort.
+    document.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "Escape" && !e.isComposing && this.overlays.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.closeTop();
+        } else if (e.key === "Tab") this.trapFocus(e);
+      },
+      true,
+    );
     this.input.addEventListener("keydown", (e) => {
       handleComposerKey(e, { send: () => void this.send(), abort: () => void this.abort() });
     });
@@ -106,20 +143,147 @@ export class App {
       this.queueRender();
     });
     $("abort").addEventListener("click", () => void this.abort());
-    ($("session-select") as HTMLSelectElement).addEventListener("change", (e) => {
-      const v = (e.target as HTMLSelectElement).value;
-      if (v) this.attach(v);
-    });
+    $("menu-button").addEventListener("click", () => this.toggleSidebar());
+    $("sheet-button").addEventListener("click", () => (this.overlays.includes("sheet") ? this.close("sheet") : this.openSheet()));
+    $("sheet-close").addEventListener("click", () => this.close("sheet"));
+    $("scrim").addEventListener("click", () => this.closeTop());
+    $("settings-link").addEventListener("click", () => this.openSettings());
+    $("settings-back").addEventListener("click", () => this.close("settings"));
+    $("logout").addEventListener("click", () => void this.logout());
     ($("thinking-select") as HTMLSelectElement).addEventListener("change", (e) => {
       void this.setThinking((e.target as HTMLSelectElement).value);
     });
-    $("model-button").addEventListener("click", () => void this.openModels());
     ($("model-filter") as HTMLInputElement).addEventListener("input", () => this.renderModels());
     $("new-session").addEventListener("click", () => void this.newSession());
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && document.activeElement !== this.input && this.t.isStreaming) void this.abort();
+      if (e.key === "Escape" && e.target !== this.input && document.activeElement !== this.input && this.t.isStreaming) void this.abort();
     });
+    $("settings-app-version").textContent = APP_VERSION;
+    this.syncOverlays();
   }
+
+  // ---- overlays -------------------------------------------------------
+
+  private open(o: Overlay, focusId: string): void {
+    if (!this.overlays.includes(o)) {
+      const active = document.activeElement;
+      // Safari does not focus buttons on tap, so fall back to the control that opens this overlay.
+      const opener = document.getElementById(o === "sheet" ? "sheet-button" : "menu-button");
+      this.returnFocus.set(o, active instanceof HTMLElement && active !== document.body ? active : opener);
+      this.overlays.push(o);
+    }
+    this.syncOverlays();
+    document.getElementById(focusId)?.focus();
+  }
+
+  close(o: Overlay): void {
+    const i = this.overlays.indexOf(o);
+    if (i < 0) return;
+    this.overlays.splice(i, 1);
+    this.syncOverlays();
+    const back = this.returnFocus.get(o);
+    this.returnFocus.delete(o);
+    if (back && back.isConnected) back.focus();
+  }
+
+  closeTop(): void {
+    const top = this.overlays[this.overlays.length - 1];
+    if (top) this.close(top);
+  }
+
+  toggleSidebar(): void {
+    if (this.isDesktop()) {
+      // Docked: the hamburger collapses and expands the sidebar instead of opening a modal.
+      const layout = $("app");
+      const collapsed = layout.classList.toggle("sidebar-collapsed");
+      $("menu-button").setAttribute("aria-expanded", String(!collapsed));
+      return;
+    }
+    if (this.overlays.includes("sidebar")) this.close("sidebar");
+    else this.open("sidebar", this.firstSessionButtonId());
+  }
+
+  private firstSessionButtonId(): string {
+    const current = document.querySelector<HTMLElement>('#session-list [aria-current="true"]');
+    return current?.id || document.querySelector<HTMLElement>("#session-list button")?.id || "settings-link";
+  }
+
+  openSheet(): void {
+    this.open("sheet", "model-filter");
+    this.renderHeader();
+    void this.loadModels();
+  }
+
+  openSettings(): void {
+    if (this.overlays.includes("sidebar")) this.close("sidebar");
+    this.renderSettings();
+    this.open("settings", "settings-back");
+  }
+
+  private syncOverlays(): void {
+    const desktop = this.isDesktop();
+    const sidebarOpen = this.overlays.includes("sidebar");
+    const sheetOpen = this.overlays.includes("sheet");
+    const settingsOpen = this.overlays.includes("settings");
+    const sidebar = $("sidebar");
+    sidebar.dataset.open = String(sidebarOpen);
+    if (sidebarOpen) {
+      sidebar.setAttribute("role", "dialog");
+      sidebar.setAttribute("aria-modal", "true");
+    } else {
+      sidebar.removeAttribute("role");
+      sidebar.removeAttribute("aria-modal");
+    }
+    if (!desktop) $("menu-button").setAttribute("aria-expanded", String(sidebarOpen));
+    $("sheet").dataset.open = String(sheetOpen);
+    $("sheet-button").setAttribute("aria-expanded", String(sheetOpen));
+    $("settings").hidden = !settingsOpen;
+    $("scrim").hidden = !(sheetOpen || sidebarOpen);
+    $("scrim").dataset.for = sheetOpen ? "sheet" : "sidebar";
+  }
+
+  private overlayElement(o: Overlay): HTMLElement {
+    return $(o === "sheet" ? "sheet" : o === "sidebar" ? "sidebar" : "settings");
+  }
+
+  /** Keep Tab inside the topmost overlay. */
+  private trapFocus(e: KeyboardEvent): void {
+    const top = this.overlays[this.overlays.length - 1];
+    if (!top) return;
+    const nodes = [...this.overlayElement(top).querySelectorAll<HTMLElement>(FOCUSABLE)];
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    if (!first || !last) return;
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || !this.overlayElement(top).contains(active))) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (active === last || !this.overlayElement(top).contains(active))) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  // ---- settings -------------------------------------------------------
+
+  renderSettings(): void {
+    const s = this.sessions.find((x) => x.id === this.conn.sessionId);
+    const pi = s?.piVersion ?? null;
+    $("settings-pi-row").hidden = !pi;
+    $("settings-pi-version").textContent = pi ?? "";
+    $("settings-app-version").textContent = APP_VERSION;
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await fetch("/api/logout", { method: "POST", credentials: "same-origin" });
+    } catch {
+      // offline: the cookie stays, but the login page is still the right place to land
+    }
+    this.navigate("/login");
+  }
+
+  // ---- frames ---------------------------------------------------------
 
   private autogrow(): void {
     this.input.style.height = "auto";
@@ -166,10 +330,19 @@ export class App {
     if (id !== this.conn.sessionId) {
       this.t = emptyTranscript();
       this.view.clear();
+      this.model = null;
     }
     this.conn.attach(id);
     this.renderSessions();
+    this.renderHeader();
     this.queueRender();
+  }
+
+  /** Tap on a sidebar entry: attach and, on the phone layout, get the flyout out of the way. */
+  selectSession(id: string): void {
+    this.attach(id);
+    if (this.overlays.includes("sidebar")) this.close("sidebar");
+    if (!this.isDesktop()) this.input.focus();
   }
 
   private sessionGone(): void {
@@ -211,6 +384,8 @@ export class App {
     this.queueRender();
   }
 
+  // ---- commands -------------------------------------------------------
+
   async send(): Promise<void> {
     const text = this.input.value;
     if (!text.trim() || !this.conn.sessionId) return;
@@ -244,11 +419,12 @@ export class App {
     if (r.success) this.model = isRec(r.data) && typeof r.data.id === "string" ? (r.data as unknown as ModelInfo) : m;
     else this.notice("error", `set model: ${r.error ?? "failed"}`);
     this.renderHeader();
+    this.renderModels();
   }
 
   async newSession(): Promise<void> {
     if (!this.conn.sessionId) return;
-    if (!window.confirm("Start a new pi session in this process? The current conversation stays in its session file.")) return;
+    if (!window.confirm("Start a new conversation in this pi process? The current one stays in its session file.")) return;
     const r: PiResponse = await this.conn.command({ type: "new_session" });
     if (!r.success) {
       this.notice("error", `new session: ${r.error ?? "failed"}`);
@@ -258,27 +434,32 @@ export class App {
       this.notice("warn", "new session cancelled by an extension");
       return;
     }
+    this.close("sheet");
     this.t = emptyTranscript();
     this.view.clear();
     void this.refreshState();
     this.queueRender();
   }
 
-  async openModels(): Promise<void> {
-    const dialog = $("model-dialog") as HTMLDialogElement;
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else dialog.setAttribute("open", "");
-    ($("model-filter") as HTMLInputElement).focus();
-    if (this.models.length === 0) {
+  loadModels(): Promise<void> {
+    if (this.models.length > 0 || !this.conn.sessionId) {
+      this.renderModels();
+      return Promise.resolve();
+    }
+    this.modelsLoading ??= (async () => {
       const r = await this.conn.command({ type: "get_available_models" });
       if (r.success && isRec(r.data) && Array.isArray(r.data.models)) {
         this.models = (r.data.models as unknown[]).filter(
           (m): m is ModelInfo => isRec(m) && typeof m.id === "string" && typeof m.provider === "string",
         );
       } else this.notice("error", `models: ${r.error ?? "failed"}`);
-    }
-    this.renderModels();
+      this.modelsLoading = null;
+      this.renderModels();
+    })();
+    return this.modelsLoading;
   }
+
+  // ---- rendering ------------------------------------------------------
 
   renderModels(): void {
     const list = $("model-list");
@@ -290,13 +471,11 @@ export class App {
         const b = document.createElement("button");
         b.type = "button";
         b.className = "model-option";
+        b.setAttribute("role", "option");
         const current = this.model && this.model.id === m.id && this.model.provider === m.provider;
         b.setAttribute("aria-selected", current ? "true" : "false");
         b.textContent = `${m.provider}/${m.id}`;
-        b.addEventListener("click", () => {
-          ($("model-dialog") as HTMLDialogElement).close();
-          void this.setModel(m);
-        });
+        b.addEventListener("click", () => void this.setModel(m));
         li.append(b);
         return li;
       }),
@@ -304,25 +483,17 @@ export class App {
   }
 
   renderHeader(): void {
-    const mb = $("model-button");
-    mb.textContent = this.model ? this.model.id : "model";
-    const ts = $("thinking-select") as HTMLSelectElement;
-    ts.value = this.thinkingLevel;
+    $("model-current").textContent = this.model ? `${this.model.provider}/${this.model.id}` : "No model";
+    ($("thinking-select") as HTMLSelectElement).value = this.thinkingLevel;
+    const s = this.sessions.find((x) => x.id === this.conn.sessionId);
+    const title = $("session-title");
+    title.textContent = s ? s.name : "Porcupine";
+    title.title = s ? s.cwd : "";
+    const attached = this.conn.sessionId !== null;
+    ($("new-session") as HTMLButtonElement).disabled = !attached;
   }
 
   renderSessions(): void {
-    const sel = $("session-select") as HTMLSelectElement;
-    const opts = this.sessions.map((s) => {
-      const o = document.createElement("option");
-      o.value = s.id;
-      o.textContent = `${s.isStreaming ? "● " : ""}${s.name}`;
-      return o;
-    });
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = this.sessions.length ? "Choose session" : "No sessions";
-    sel.replaceChildren(placeholder, ...opts);
-    sel.value = this.conn.sessionId ?? "";
     const list = $("session-list");
     list.replaceChildren(
       ...this.sessions.map((s) => {
@@ -330,20 +501,32 @@ export class App {
         const b = document.createElement("button");
         b.type = "button";
         b.className = "session-item";
+        b.id = `session-${s.id}`;
         if (s.id === this.conn.sessionId) b.setAttribute("aria-current", "true");
         const name = document.createElement("span");
         name.className = "session-name";
-        name.textContent = `${s.isStreaming ? "● " : ""}${s.name}`;
+        name.textContent = s.name;
+        if (s.isStreaming) {
+          const dot = document.createElement("span");
+          dot.className = "session-streaming";
+          dot.setAttribute("role", "img");
+          dot.setAttribute("aria-label", "running");
+          name.append(dot);
+        }
         const cwd = document.createElement("span");
         cwd.className = "session-cwd";
-        cwd.textContent = s.cwd;
+        cwd.textContent = basename(s.cwd);
+        b.title = s.cwd;
         b.append(name, cwd);
-        b.addEventListener("click", () => this.attach(s.id));
+        b.addEventListener("click", () => this.selectSession(s.id));
         li.append(b);
         return li;
       }),
     );
+    $("session-empty").hidden = this.sessions.length > 0;
     $("empty").hidden = this.conn.sessionId !== null;
+    this.renderHeader();
+    if (!$("settings").hidden) this.renderSettings();
   }
 
   private queueRender(): void {
@@ -362,7 +545,6 @@ export class App {
     const streaming = this.t.isStreaming;
     $("abort").hidden = !streaming;
     $("send").hidden = streaming && !this.input.value.trim();
-    $("steer-wrap").hidden = !streaming;
     $("run-status").textContent = streaming ? "Running" : "Idle";
     $("empty").hidden = this.conn.sessionId !== null;
     if (nearBottom) this.main.scrollTop = this.main.scrollHeight;

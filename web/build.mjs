@@ -1,6 +1,15 @@
 import { build } from "esbuild";
 import { copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { basename } from "node:path";
+
+function appVersion() {
+  try {
+    return execFileSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim() || "dev";
+  } catch {
+    return "dev";
+  }
+}
 
 rmSync("dist", { recursive: true, force: true });
 mkdirSync("dist/icons", { recursive: true });
@@ -15,6 +24,7 @@ const app = await build({
   minify: true,
   sourcemap: true,
   metafile: true,
+  define: { __APP_VERSION__: JSON.stringify(appVersion()) },
 });
 
 const outputs = Object.keys(app.metafile.outputs).filter((p) => !p.endsWith(".map"));
