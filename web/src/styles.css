@@ -102,9 +102,11 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fo
   background: var(--panel);
   min-width: 0;
 }
+.brand-button { flex: none; }
+.settings-head .theme-toggle { margin-left: auto; }
 .brand-logo {
   flex: none;
-  width: 36px;
+  width: 26px;
   height: auto;
   color: var(--crayon);
   pointer-events: none;

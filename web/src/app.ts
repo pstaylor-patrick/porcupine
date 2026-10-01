@@ -30,7 +30,7 @@ import {
   type UsageReport,
 } from "./usage.js";
 import { CommandMenu, parseCommands } from "./commands.js";
-import { autocompactCommand, contextPercent, defaultThreshold, groupDigits, contextText, parseContextUsage, type ContextInfo } from "./context.js";
+import { autocompactCommand, defaultThreshold, groupDigits, contextText, parseContextUsage, type ContextInfo } from "./context.js";
 import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
 import { TranscriptView } from "./render.js";
 import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./transcript.js";
@@ -248,7 +248,6 @@ export class App {
       fileInput.value = "";
     });
     $("menu-button").addEventListener("click", () => this.toggleSidebar());
-    $("sheet-button").addEventListener("click", () => (this.overlays.includes("sheet") ? this.close("sheet") : this.openSheet()));
     $("session-title").addEventListener("click", () =>
       this.overlays.includes("sheet") ? this.close("sheet") : this.openSheet($("session-title")),
     );
@@ -257,7 +256,12 @@ export class App {
     $("dialog-close").addEventListener("click", () => this.close("dialog"));
     $("dialog-reopen").addEventListener("click", () => this.showDialog());
     $("settings-link").addEventListener("click", () => this.openSettings());
-    $("settings-back").addEventListener("click", () => this.close("settings"));
+    // Settings is reached from the sessions drawer; its menu button goes back there.
+    $("settings-back").addEventListener("click", () => {
+      this.close("settings");
+      if (this.isDesktop()) $("app").classList.remove("sidebar-collapsed");
+      else if (!this.overlays.includes("sidebar")) this.toggleSidebar();
+    });
     $("logout").addEventListener("click", () => void this.logout());
     $("reload-app").addEventListener("click", () => void reloadLatest());
     $("push-toggle").addEventListener("change", (e) => void this.togglePush((e.target as HTMLInputElement).checked));
@@ -313,7 +317,7 @@ export class App {
     if (!this.overlays.includes(o)) {
       const active = document.activeElement;
       // Safari does not focus buttons on tap, so fall back to the control that opens this overlay.
-      const opener = document.getElementById(o === "sheet" ? "sheet-button" : o === "dialog" ? "input" : "menu-button");
+      const opener = document.getElementById(o === "sheet" ? "session-title" : o === "dialog" ? "input" : "menu-button");
       this.returnFocus.set(o, explicitOpener ?? (active instanceof HTMLElement && active !== document.body ? active : opener));
       this.overlays.push(o);
     }
@@ -388,7 +392,6 @@ export class App {
     }
     if (!desktop) $("menu-button").setAttribute("aria-expanded", String(sidebarOpen));
     $("sheet").dataset.open = String(sheetOpen);
-    $("sheet-button").setAttribute("aria-expanded", String(sheetOpen));
     $("session-title").setAttribute("aria-expanded", String(sheetOpen));
     $("settings").hidden = !settingsOpen;
     $("scrim").hidden = !(sheetOpen || sidebarOpen || dialogOpen);
@@ -829,11 +832,6 @@ export class App {
     meter.dataset.level = pctUsed >= 80 ? "high" : "ok";
     (meter.firstElementChild as HTMLElement).style.width = `${pctUsed}%`;
     $("context-text").textContent = this.compacting ? `${contextText(c)} (compacting)` : contextText(c);
-    const pct = $("context-pct");
-    const label = contextPercent(c);
-    pct.textContent = label ? `${label} ctx` : "";
-    pct.title = label ? `Context used: ${contextText(c)}` : "";
-    pct.hidden = label === null || this.conn.sessionId === null;
     const attached = this.conn.sessionId !== null;
     const u = this.sessionUsage;
     $("session-usage").textContent = sessionUsageText(u);

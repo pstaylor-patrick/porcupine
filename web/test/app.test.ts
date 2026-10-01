@@ -216,15 +216,15 @@ describe("app", () => {
 
   it("opens and closes the session sheet from the header", () => {
     const { app } = setup({});
-    byId("sheet-button").click();
+    byId("session-title").click();
     expect(byId("sheet").dataset.open).toBe("true");
-    expect(byId("sheet-button").getAttribute("aria-expanded")).toBe("true");
+    expect(byId("session-title").getAttribute("aria-expanded")).toBe("true");
     expect(byId("sheet").getAttribute("role")).toBe("dialog");
     expect(document.activeElement?.id).toBe("sheet-title");
     byId("sheet-close").click();
     expect(byId("sheet").dataset.open).toBe("false");
-    expect(document.activeElement?.id).toBe("sheet-button");
-    byId("sheet-button").click();
+    expect(document.activeElement?.id).toBe("session-title");
+    byId("session-title").click();
     byId("scrim").click();
     expect(app.overlays).toEqual([]);
   });
