@@ -1078,3 +1078,69 @@ describe("compaction hold", () => {
     expect(app.held).toEqual([]);
   });
 });
+
+describe("desktop modals", () => {
+  function setupDesktop() {
+    loadShell();
+    const conn = new Connection(
+      { url: "ws://x/ws", storage: null },
+      { onFrame: () => undefined, onStatus: () => undefined },
+    );
+    vi.spyOn(conn, "command").mockResolvedValue({ success: true });
+    const app = new App(conn);
+    app.isDesktop = () => true;
+    app.bind();
+    return { app };
+  }
+  const byId = (id: string) => document.getElementById(id) as HTMLElement;
+
+  it("opens session settings from the title, Esc closes it and focus returns", () => {
+    const { app } = setupDesktop();
+    byId("session-title").focus();
+    byId("session-title").click();
+    expect(app.overlays).toEqual(["sheet"]);
+    expect(byId("sheet").dataset.open).toBe("true");
+    expect(byId("scrim").hidden).toBe(false);
+    document.dispatchEvent(key("Escape"));
+    expect(app.overlays).toEqual([]);
+    expect(byId("sheet").dataset.open).toBe("false");
+    expect(document.activeElement?.id).toBe("session-title");
+  });
+
+  it("closes the session modal from the scrim", () => {
+    const { app } = setupDesktop();
+    byId("session-title").click();
+    byId("scrim").click();
+    expect(app.overlays).toEqual([]);
+  });
+
+  it("splits the sheet into controls and the model picker in phone order", () => {
+    setupDesktop();
+    const controls = byId("sheet").querySelector(".sheet-controls");
+    const models = byId("sheet").querySelector(".sheet-models");
+    expect(controls?.querySelector("#session-card")).not.toBeNull();
+    expect(controls?.querySelector("#merge-mode-select")).not.toBeNull();
+    expect(controls?.querySelector("#model-filter")).toBeNull();
+    expect(models?.querySelector("#model-filter")).not.toBeNull();
+    expect(controls?.nextElementSibling).toBe(models);
+  });
+
+  it("opens and closes an extension dialog through the overlay stack", () => {
+    const { app } = setupDesktop();
+    app.onFrame({
+      t: "event",
+      event: {
+        type: "extension_ui_request",
+        id: "c",
+        method: "confirm",
+        title: "Sure?",
+        message: "m",
+      },
+    } as never);
+    expect(app.overlays).toEqual(["dialog"]);
+    expect(byId("dialog").dataset.open).toBe("true");
+    document.dispatchEvent(key("Escape"));
+    expect(app.overlays).toEqual([]);
+    expect(byId("dialog").dataset.open).toBe("false");
+  });
+});

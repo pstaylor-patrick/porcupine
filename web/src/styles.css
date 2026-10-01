@@ -218,6 +218,9 @@ select {
 .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; }
 .sheet-title { margin: 0; font-size: 1.05rem; }
 .sheet-body { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 16px; padding: 4px; margin: 0 -4px; }
+/* Two wrappers so desktop can split controls and the model picker into columns; on phones they read as one stack. */
+#sheet .sheet-controls { display: contents; }
+#sheet .sheet-models { margin-top: 14px; padding-top: 20px; border-top: 1px solid var(--line); }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .field-hint { margin: 0; font-size: 0.85em; color: var(--muted); }
@@ -405,18 +408,44 @@ details > :not(summary) { padding: 0 12px 10px; }
     transition: none;
     min-height: 0;
   }
-  .sheet {
-    left: auto; top: 0;
-    width: 380px;
-    max-height: none;
-    border-top: 0;
-    border-left: 1px solid var(--line);
-    border-radius: 0;
-    padding-top: calc(env(safe-area-inset-top) + 8px);
-    transform: translateX(100%);
+  /* Session settings and extension dialogs: centered modals over the scrim. */
+  #sheet, #dialog {
+    left: 50%; right: auto; top: 50%; bottom: auto;
+    width: min(720px, 92vw);
+    max-height: min(720px, 90dvh);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 8px 20px 20px;
+    background: var(--bg);
+    box-shadow: 0 24px 64px rgb(0 0 0 / 0.28);
+    transform: translate(-50%, calc(-50% + 12px));
+    opacity: 0;
+    transition: transform 160ms ease, opacity 160ms ease, visibility 0s linear 160ms;
+  }
+  #dialog { width: min(560px, 92vw); }
+  #sheet[data-open="true"], #dialog[data-open="true"] {
+    transform: translate(-50%, -50%);
+    opacity: 1;
+    transition: transform 160ms ease, opacity 160ms ease;
   }
   .model-browser { max-height: 50dvh; }
   .composer { padding-left: max(var(--gutter), calc((100% - 900px) / 2 + var(--gutter))); padding-right: max(var(--gutter), calc((100% - 900px) / 2 + var(--gutter))); }
+}
+
+@media (min-width: 1100px) {
+  /* Two columns: controls left, the model picker filling the right column as its only scroller. */
+  #sheet { width: min(1040px, 92vw); height: min(720px, 90dvh); }
+  #sheet .sheet-body {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    gap: 0 28px;
+    overflow: hidden;
+  }
+  #sheet .sheet-controls { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow-y: auto; padding: 4px; margin: -4px; }
+  #sheet .sheet-models { display: flex; flex-direction: column; min-height: 0; margin: 0; padding: 0 0 0 28px; border-top: 0; border-left: 1px solid var(--line); }
+  #sheet .sheet-models > .field { flex: 1 1 auto; min-height: 0; }
+  #sheet .model-browser { flex: 1 1 auto; min-height: 0; max-height: none; }
 }
 
 /* Extension dialogs and ask_user_question. */
@@ -499,8 +528,8 @@ details > :not(summary) { padding: 0 12px 10px; }
 .context-row input:disabled { opacity: 0.45; }
 .switch-row label:first-child { flex: 1; }
 .sheet-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
-.sheet-actions button { min-height: 48px; border-radius: 12px; border: 0; font: inherit; font-weight: 600; cursor: pointer; }
-.sheet-actions button:disabled { opacity: 0.5; cursor: default; }
+.sheet-actions button, #sheet .sheet-models button { min-height: 48px; border-radius: 12px; border: 0; font: inherit; font-weight: 600; cursor: pointer; }
+.sheet-actions button:disabled, #sheet .sheet-models button:disabled { opacity: 0.5; cursor: default; }
 .switch { position: relative; display: inline-flex; flex: none; cursor: pointer; }
 .switch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
 .switch span { width: 44px; height: 26px; border-radius: 999px; background: var(--line); transition: background 0.2s ease; }
