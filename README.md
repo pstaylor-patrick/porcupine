@@ -263,7 +263,8 @@ scripts/caddy-keys.sh   # writes the IAM access key to ~/.config/porcupine/caddy
 npm ci
 npm run typecheck && npm run lint && npm test && npm run build
 scripts/dev.sh          # hub on localhost in dev mode
-scripts/smoke.sh        # end-to-end against a running hub and real pi
+npm run smoke           # live: real pi session through the running hub; checks extensions load,
+                        # a prompt round-trips and the usage ledger records it
 ```
 
 ### Keeping your details out of commits

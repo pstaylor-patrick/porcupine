@@ -14,7 +14,8 @@
     "build": "npm run build --workspaces",
     "test": "npm test --workspaces",
     "typecheck": "npm run typecheck --workspaces",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "smoke": "scripts/smoke.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

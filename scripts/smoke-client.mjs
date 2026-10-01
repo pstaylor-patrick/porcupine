@@ -151,6 +151,21 @@ async function main() {
   const thinking = await conn.cmd({ type: "set_thinking_level", level: "low" });
   assert(thinking.success === true, `set_thinking_level low succeeds${thinking.error ? `: ${thinking.error}` : ""}`);
 
+  // Extensions porcupine loads into pi: each registers a slash command.
+  const cmds = await conn.cmd({ type: "get_commands" });
+  assert(cmds.success === true, "get_commands succeeds");
+  const commandNames = (Array.isArray(cmds.data?.commands) ? cmds.data.commands : Array.isArray(cmds.data) ? cmds.data : []).map((c) => c?.name);
+  for (const name of ["autocompact", "loop", "plan", "plan-todos", "todos"]) {
+    assert(commandNames.includes(name), `extension command /${name} is loaded`);
+  }
+  const usageTokens = async () => {
+    const res = await fetch(`${BASE}/api/usage`, { headers: { cookie } });
+    assert(res.status === 200, `GET /api/usage returns 200 (got ${res.status})`);
+    const body = await res.json();
+    return (body.providers ?? []).reduce((n, p) => n + (p.input ?? 0) + (p.output ?? 0), 0);
+  };
+  const tokensBefore = await usageTokens();
+
   const settled = conn.waitFor("agent_settled", (f) => f.t === "event" && f.event.type === "agent_settled", RUN_TIMEOUT_MS);
   const prompt = await conn.cmd({ type: "prompt", message: "Reply with exactly the word: porcupine", images: [] });
   assert(prompt.success === true, `prompt accepted${prompt.error ? `: ${prompt.error}` : ""}`);
@@ -168,6 +183,13 @@ async function main() {
   );
   const text = assistantText(reply);
   assert(text.trim().length > 0, `assistant reply has text: ${JSON.stringify(text.slice(0, 80))}`);
+
+  let tokensAfter = tokensBefore;
+  for (let i = 0; i < 10 && tokensAfter <= tokensBefore; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    tokensAfter = await usageTokens();
+  }
+  assert(tokensAfter > tokensBefore, `usage ledger recorded the run (${tokensBefore} -> ${tokensAfter} tokens)`);
 
   const fresh = await conn.cmd({ type: "new_session" });
   assert(fresh.success === true, `new_session succeeds${fresh.error ? `: ${fresh.error}` : ""}`);
