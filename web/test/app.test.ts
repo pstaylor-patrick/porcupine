@@ -1212,3 +1212,91 @@ describe("settings modal", () => {
     ).toBe(false);
   });
 });
+
+describe("header gear and shortcuts", () => {
+  function setup(desktop: boolean) {
+    loadShell();
+    const conn = new Connection(
+      { url: "ws://x/ws", storage: null },
+      { onFrame: () => undefined, onStatus: () => undefined },
+    );
+    vi.spyOn(conn, "command").mockResolvedValue({ success: true });
+    conn.sessionId = "s1";
+    const app = new App(conn);
+    app.isDesktop = () => desktop;
+    app.bind();
+    return { app, conn };
+  }
+  const byId = (id: string) => document.getElementById(id) as HTMLElement;
+
+  it("gear opens session settings and focus returns to it", () => {
+    const { app } = setup(true);
+    const gear = byId("session-gear");
+    expect(gear.querySelector("svg")).not.toBeNull();
+    expect(gear.title).toMatch(/\+\.\)$/);
+    gear.focus();
+    gear.click();
+    expect(app.overlays).toEqual(["sheet"]);
+    document.dispatchEvent(key("Escape"));
+    expect(app.overlays).toEqual([]);
+    expect(document.activeElement?.id).toBe("session-gear");
+  });
+
+  it("Ctrl+, opens Settings, closing the sheet first", () => {
+    const { app } = setup(true);
+    byId("session-title").click();
+    const e = key(",", { ctrlKey: true });
+    document.dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(true);
+    expect(app.overlays).toEqual(["settings"]);
+  });
+
+  it("Ctrl+. opens session settings, closing Settings first", () => {
+    const { app } = setup(true);
+    document.dispatchEvent(key(",", { metaKey: true }));
+    document.dispatchEvent(key(".", { ctrlKey: true }));
+    expect(app.overlays).toEqual(["sheet"]);
+  });
+
+  it("Ctrl+. is a no-op without a session", () => {
+    const { app, conn } = setup(true);
+    conn.sessionId = null;
+    const e = key(".", { ctrlKey: true });
+    document.dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(false);
+    expect(app.overlays).toEqual([]);
+  });
+
+  it("Ctrl+B toggles the docked sidebar; unmodified and shifted keys pass through", () => {
+    setup(true);
+    const e = key("b", { ctrlKey: true });
+    document.dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(true);
+    expect(byId("app").classList.contains("sidebar-collapsed")).toBe(true);
+    document.dispatchEvent(key("B", { ctrlKey: true }));
+    expect(byId("app").classList.contains("sidebar-collapsed")).toBe(false);
+    const plain = key("b");
+    document.dispatchEvent(plain);
+    expect(plain.defaultPrevented).toBe(false);
+    const shifted = key("B", { ctrlKey: true, shiftKey: true });
+    document.dispatchEvent(shifted);
+    expect(shifted.defaultPrevented).toBe(false);
+  });
+
+  it("phone: Ctrl+B opens and closes the sidebar overlay", () => {
+    const { app } = setup(false);
+    document.dispatchEvent(key("b", { ctrlKey: true }));
+    expect(app.overlays).toEqual(["sidebar"]);
+    document.dispatchEvent(key("b", { ctrlKey: true }));
+    expect(app.overlays).toEqual([]);
+  });
+
+  it("Esc closes a shortcut-opened modal before reaching the composer", () => {
+    const { app } = setup(true);
+    document.dispatchEvent(key(".", { ctrlKey: true }));
+    const esc = key("Escape");
+    document.dispatchEvent(esc);
+    expect(esc.defaultPrevented).toBe(true);
+    expect(app.overlays).toEqual([]);
+  });
+});

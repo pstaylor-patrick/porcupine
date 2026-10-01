@@ -15,6 +15,7 @@ import {
   type Pending,
   type UploadsConfig,
 } from "./attachments.js";
+import { GEAR_PATH, icon } from "./markdown.js";
 import { MergeModePicker } from "./merge-mode.js";
 import { StatusPanel } from "./status-panel.js";
 import {
@@ -293,6 +294,7 @@ export class App {
           e.stopPropagation();
           this.closeTop();
         } else if (e.key === "Tab") this.trapFocus(e);
+        else if (this.handleShortcut(e)) e.preventDefault();
       },
       true,
     );
@@ -345,6 +347,18 @@ export class App {
         ? this.close("sheet")
         : this.openSheet($("session-title")),
     );
+    const gear = $("session-gear");
+    gear.append(icon(GEAR_PATH));
+    gear.addEventListener("click", () =>
+      this.overlays.includes("sheet")
+        ? this.close("sheet")
+        : this.openSheet(gear),
+    );
+    const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "Cmd" : "Ctrl";
+    gear.title = `Session settings (${mod}+.)`;
+    $("session-title").title = `Session settings (${mod}+.)`;
+    $("settings-link").title = `Settings (${mod}+,)`;
+    $("menu-button").title = `Sessions (${mod}+B)`;
     $("sheet-close").addEventListener("click", () => this.close("sheet"));
     $("scrim").addEventListener("click", () => this.closeTop());
     $("dialog-close").addEventListener("click", () => this.close("dialog"));
@@ -482,6 +496,30 @@ export class App {
     const back = this.returnFocus.get(o);
     this.returnFocus.delete(o);
     if (back && back.isConnected) back.focus();
+  }
+
+  /** Cmd/Ctrl+, Settings; Cmd/Ctrl+. session settings; Cmd/Ctrl+B sidebar. True when handled. */
+  private handleShortcut(e: KeyboardEvent): boolean {
+    if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.isComposing)
+      return false;
+    // A replaced shell (tests reload it) leaves this instance's listener behind; only the live one acts.
+    if (!this.input.isConnected) return false;
+    if (e.key === ",") {
+      if (this.overlays.includes("sheet")) this.close("sheet");
+      if (!this.overlays.includes("settings")) this.openSettings();
+      return true;
+    }
+    if (e.key === ".") {
+      if (!this.conn.sessionId) return false;
+      if (this.overlays.includes("settings")) this.close("settings");
+      if (!this.overlays.includes("sheet")) this.openSheet($("session-gear"));
+      return true;
+    }
+    if (e.key === "b" || e.key === "B") {
+      this.toggleSidebar();
+      return true;
+    }
+    return false;
   }
 
   closeTop(): void {

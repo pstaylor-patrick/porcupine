@@ -575,6 +575,8 @@ details > :not(summary) { padding: 0 12px 10px; }
 .switch input:checked + span { background: var(--crayon); }
 .switch input:checked + span::after { transform: translateX(18px); }
 .switch input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+.session-gear { display: none; }
+@media (min-width: 900px) { .session-gear { display: inline-flex; align-items: center; justify-content: center; } }
 .context-pct { font-size: 0.75rem; color: var(--muted, inherit); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .notice { max-width: min(420px, calc(100vw - 32px)); padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--fg); }
