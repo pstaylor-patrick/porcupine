@@ -149,24 +149,6 @@
           </div>
           <p id="autocompact-hint" class="field-hint">Tokens. Leave empty for the default.</p>
         </div>
-        <div class="field" id="history-block">
-          <span class="field-label" id="history-label">History</span>
-          <ul id="history-list" class="history-list" aria-labelledby="history-label"></ul>
-          <label class="visually-hidden" for="session-name-input">Session name</label>
-          <div class="context-row">
-            <input id="session-name-input" type="text" autocomplete="off" placeholder="Session name" />
-            <button id="session-rename" type="button" class="secondary">Rename</button>
-          </div>
-          <label class="visually-hidden" for="switch-path-input">Session file to open</label>
-          <div class="context-row">
-            <input id="switch-path-input" type="text" autocomplete="off" spellcheck="false" placeholder="/path/to/session.jsonl" />
-            <button id="session-switch" type="button" class="secondary">Switch</button>
-          </div>
-          <div class="context-row">
-            <button id="session-clone" type="button" class="secondary">Clone conversation</button>
-          </div>
-          <p id="history-status" class="field-hint" role="status" aria-live="polite"></p>
-        </div>
         <div class="sheet-actions">
           <button id="compact-now" type="button" class="secondary">Compact now</button>
           <button id="new-session" type="button" class="primary">New conversation</button>
@@ -185,7 +167,10 @@
       </dl>
       <section class="settings-section" aria-labelledby="push-title">
         <h3 id="push-title" class="settings-subtitle">Notifications</h3>
-        <label class="push-row"><input id="push-toggle" type="checkbox" role="switch"> Push notifications on this device</label>
+        <div class="switch-row push-row">
+          <label for="push-toggle">Push notifications on this device</label>
+          <label class="switch"><input id="push-toggle" type="checkbox" role="switch" /><span aria-hidden="true"></span></label>
+        </div>
         <p id="push-status" class="field-hint" role="status" aria-live="polite"></p>
       </section>
       <section class="settings-section" aria-labelledby="usage-title">
@@ -199,12 +184,12 @@
           <div id="budget-rows"></div>
           <div class="budget-actions">
             <button id="budget-add" type="button" class="secondary">Add</button>
-            <button id="budget-save" type="submit" class="primary">Save</button>
+            <button id="budget-save" type="submit" class="secondary">Save</button>
           </div>
           <p id="budget-status" class="field-hint" role="status" aria-live="polite"></p>
         </form>
       </section>
-      <button id="reload-app" type="button" class="secondary settings-logout settings-reload">Reload latest version</button>
+      <button id="reload-app" type="button" class="primary settings-logout settings-reload">Reload latest version</button>
       <button id="logout" type="button" class="secondary settings-logout">Log out</button>
     </section>
   </body>

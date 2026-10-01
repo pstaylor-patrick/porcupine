@@ -29,7 +29,6 @@ import {
   type UsageReport,
 } from "./usage.js";
 import { CommandMenu, parseCommands } from "./commands.js";
-import { flattenTree, renderHistory } from "./history.js";
 import { autocompactCommand, contextPercent, defaultThreshold, groupDigits, contextText, parseContextUsage, type ContextInfo } from "./context.js";
 import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
 import { TranscriptView } from "./render.js";
@@ -275,12 +274,6 @@ export class App {
     ($("vendor-jump") as HTMLSelectElement).addEventListener("change", (e) => this.jumpToVendor(e.target as HTMLSelectElement));
     $("new-session").addEventListener("click", () => void this.newSession());
     $("abort-retry").addEventListener("click", () => void this.abortRetry());
-    $("session-clone").addEventListener("click", () => void this.historyCommand({ type: "clone" }, "cloned"));
-    $("session-switch").addEventListener("click", () => {
-      const sessionPath = ($("switch-path-input") as HTMLInputElement).value.trim();
-      if (sessionPath) void this.historyCommand({ type: "switch_session", sessionPath }, "switched");
-    });
-    $("session-rename").addEventListener("click", () => void this.renameSession());
     $("compact-now").addEventListener("click", () => void this.compactNow());
     $("autocompact-save").addEventListener("click", () => void this.saveAutocompact());
     const threshold = $("autocompact-input") as HTMLInputElement;
@@ -352,7 +345,6 @@ export class App {
     this.renderHeader();
     void this.loadModels();
     void this.refreshContext();
-    void this.loadHistory();
     this.mergeMode ??= new MergeModePicker($("merge-mode-select") as HTMLSelectElement, $("merge-mode-status"));
     void this.mergeMode.load(this.conn.sessionId);
   }
@@ -824,7 +816,7 @@ export class App {
     ($("autocompact-input") as HTMLInputElement).placeholder = groupDigits(String(defaultThreshold(this.model?.contextWindow)));
   }
 
-  // ---- slash commands, history, retry -------------------------------
+  // ---- slash commands, retry -------------------------------
 
   async loadCommands(): Promise<void> {
     const sid = this.conn.sessionId;
@@ -832,71 +824,6 @@ export class App {
     const r = await this.conn.command({ type: "get_commands" });
     if (this.conn.sessionId !== sid || !r.success) return;
     this.commandMenu.setCommands(parseCommands(r.data));
-  }
-
-  async loadHistory(): Promise<void> {
-    const sid = this.conn.sessionId;
-    const list = $("history-list");
-    for (const id of ["session-clone", "session-switch", "session-rename"]) ($(id) as HTMLButtonElement).disabled = !sid;
-    if (!sid) {
-      list.replaceChildren();
-      return;
-    }
-    const [tree, state] = await Promise.all([this.conn.command({ type: "get_tree" }), this.conn.command({ type: "get_state" })]);
-    if (this.conn.sessionId !== sid) return;
-    renderHistory(list, tree.success ? flattenTree(tree.data) : [], { fork: (entryId) => void this.fork(entryId) });
-    $("history-status").textContent = tree.success ? "" : `history: ${tree.error ?? "unavailable"}`;
-    if (state.success && isRec(state.data)) {
-      const name = $("session-name-input") as HTMLInputElement;
-      if (document.activeElement !== name && typeof state.data.sessionName === "string") name.value = state.data.sessionName;
-      const path = $("switch-path-input") as HTMLInputElement;
-      if (!path.value && typeof state.data.sessionFile === "string") path.value = state.data.sessionFile;
-    }
-  }
-
-  /** Runs fork/clone/switch_session, then rebuilds the transcript for the new branch. */
-  async historyCommand(cmd: Record<string, unknown> & { type: string }, done: string): Promise<boolean> {
-    if (!this.conn.sessionId) return false;
-    const status = $("history-status");
-    status.textContent = "Working";
-    const r = await this.conn.command(cmd);
-    if (!r.success) {
-      status.textContent = `${cmd.type}: ${r.error ?? "failed"}`;
-      return false;
-    }
-    if (isRec(r.data) && r.data.cancelled === true) {
-      status.textContent = `${cmd.type} cancelled by an extension`;
-      return false;
-    }
-    status.textContent = done;
-    await this.rebuild();
-    void this.loadHistory();
-    void this.loadCommands();
-    return true;
-  }
-
-  async fork(entryId: string): Promise<void> {
-    if (!this.conn.sessionId) return;
-    const r = await this.conn.command({ type: "fork", entryId });
-    if (!r.success || (isRec(r.data) && r.data.cancelled === true)) {
-      $("history-status").textContent = r.success ? "fork cancelled by an extension" : `fork: ${r.error ?? "failed"}`;
-      return;
-    }
-    $("history-status").textContent = "forked";
-    // pi hands back the forked prompt so it can be edited and resent.
-    if (isRec(r.data) && typeof r.data.text === "string" && !this.input.value) {
-      this.input.value = r.data.text;
-      this.autogrow();
-    }
-    await this.rebuild();
-    void this.loadHistory();
-  }
-
-  async renameSession(): Promise<void> {
-    const name = ($("session-name-input") as HTMLInputElement).value.trim();
-    if (!this.conn.sessionId || !name) return;
-    const r = await this.conn.command({ type: "set_session_name", name });
-    $("history-status").textContent = r.success ? "renamed" : `rename: ${r.error ?? "failed"}`;
   }
 
   applyRetry(ev: Record<string, unknown>): void {
