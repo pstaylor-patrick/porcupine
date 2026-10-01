@@ -9,22 +9,28 @@ function key(k: string, init: KeyboardEventInit = {}): KeyboardEvent {
 }
 
 describe("keyboard", () => {
-  it("Enter sends, Shift+Enter does not, Esc aborts", () => {
+  it("Enter sends, Shift+Enter does not, Esc pops the queue or blurs", () => {
     const send = vi.fn();
-    const abort = vi.fn();
+    const popQueue = vi.fn(() => true);
     const enter = key("Enter");
-    expect(handleComposerKey(enter, { send, abort })).toBe(true);
+    expect(handleComposerKey(enter, { send, popQueue })).toBe(true);
     expect(enter.defaultPrevented).toBe(true);
     expect(send).toHaveBeenCalledTimes(1);
 
     const shift = key("Enter", { shiftKey: true });
-    expect(handleComposerKey(shift, { send, abort })).toBe(false);
+    expect(handleComposerKey(shift, { send, popQueue })).toBe(false);
     expect(shift.defaultPrevented).toBe(false);
     expect(send).toHaveBeenCalledTimes(1);
 
-    expect(handleComposerKey(key("Escape"), { send, abort })).toBe(true);
-    expect(abort).toHaveBeenCalledTimes(1);
-    expect(handleComposerKey(key("a"), { send, abort })).toBe(false);
+    expect(handleComposerKey(key("Escape"), { send, popQueue })).toBe(true);
+    expect(popQueue).toHaveBeenCalledTimes(1);
+    const input = document.createElement("textarea");
+    document.body.append(input);
+    input.focus();
+    expect(handleComposerKey(Object.defineProperty(key("Escape"), "target", { value: input }), { send, popQueue: () => false })).toBe(true);
+    expect(document.activeElement).not.toBe(input);
+    input.remove();
+    expect(handleComposerKey(key("a"), { send, popQueue })).toBe(false);
   });
 });
 
@@ -123,12 +129,16 @@ describe("app", () => {
     expect(document.querySelector(".notice-error")?.textContent).toContain("agent is streaming");
   });
 
-  it("Esc in the composer sends abort", async () => {
-    const { conn, sent } = setup({});
+  it("Esc in the composer never aborts and blurs when nothing is queued", async () => {
+    const { app, conn, sent } = setup({});
     conn.sessionId = "s1";
+    app.t.isStreaming = true;
     const input = document.getElementById("input") as HTMLTextAreaElement;
+    input.focus();
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
-    await vi.waitFor(() => expect(sent).toEqual([{ type: "clear_queue" }, { type: "abort" }]));
+    await Promise.resolve();
+    expect(sent).toEqual([]);
+    expect(document.activeElement).not.toBe(input);
   });
 
   const sessions = [
@@ -259,7 +269,7 @@ describe("app", () => {
     expect(document.activeElement?.id).toBe("session-title");
   });
 
-  it("Esc closes an open overlay before it aborts", async () => {
+  it("Esc closes an open overlay before it pops the queue", async () => {
     const { app, conn, sent } = setup({});
     conn.sessionId = "s1";
     app.t.isStreaming = true;
@@ -279,8 +289,9 @@ describe("app", () => {
     await Promise.resolve();
     expect(sent).toEqual([]);
 
+    app.queue = { steering: [], followUp: ["q1"] };
     input.dispatchEvent(esc());
-    await vi.waitFor(() => expect(sent).toEqual([{ type: "clear_queue" }, { type: "abort" }]));
+    await vi.waitFor(() => expect(sent).toEqual([{ type: "clear_queue" }]));
   });
 
   it("sends set_model and set_thinking_level with the right fields from the sheet", async () => {
@@ -542,5 +553,102 @@ describe("app", () => {
     await app.abort();
     expect(sent.map((c) => c.type)).toEqual(["clear_queue", "abort"]);
     expect(input.value).toBe("s1\n\nf1\n\nf2\n\ndraft");
+  });
+
+  /** A fake pi command channel: clear_queue returns the current queue; steer/follow_up append, optionally failing. */
+  function fakePi(start: { steering: string[]; followUp: string[] }, failOn?: string) {
+    const ctx = setup({});
+    ctx.conn.sessionId = "s1";
+    let q = { steering: [...start.steering], followUp: [...start.followUp] };
+    ctx.app.queue = { steering: [...q.steering], followUp: [...q.followUp] };
+    vi.mocked(ctx.conn.command).mockImplementation((cmd) => {
+      ctx.sent.push(cmd);
+      if (cmd.type === "clear_queue") {
+        const data = q;
+        q = { steering: [], followUp: [] };
+        return Promise.resolve({ success: true, data });
+      }
+      if (cmd.type === "steer" || cmd.type === "follow_up") {
+        if (cmd.message === failOn) return Promise.resolve({ success: false, error: "nope" });
+        (cmd.type === "steer" ? q.steering : q.followUp).push(cmd.message as string);
+      }
+      return Promise.resolve({ success: true });
+    });
+    return { ...ctx, pi: () => q, setPi: (n: typeof q) => (q = n) };
+  }
+
+  it("cancel requeues the rest in order, one command at a time", async () => {
+    const { app, sent, pi } = fakePi({ steering: ["s1"], followUp: ["f1", "f2", "f3"] });
+    await app.queueAction(2, "cancel");
+    expect(sent.map((c) => [c.type, c.message])).toEqual([
+      ["clear_queue", undefined],
+      ["steer", "s1"],
+      ["follow_up", "f1"],
+      ["follow_up", "f3"],
+    ]);
+    expect(pi()).toEqual({ steering: ["s1"], followUp: ["f1", "f3"] });
+    expect(app.queueBusy).toBe(false);
+  });
+
+  it("send now promotes the item to a leading steer", async () => {
+    const { app, pi } = fakePi({ steering: ["s1"], followUp: ["f1", "f2"] });
+    await app.queueAction(2, "sendNow");
+    expect(pi()).toEqual({ steering: ["f2", "s1"], followUp: ["f1"] });
+  });
+
+  it("removes only the chosen one of duplicate texts", async () => {
+    const { app, pi } = fakePi({ steering: [], followUp: ["x", "y", "x"] });
+    await app.queueAction(2, "cancel");
+    expect(pi()).toEqual({ steering: [], followUp: ["x", "y"] });
+  });
+
+  it("edit puts the chip text ahead of the draft", async () => {
+    const { app, pi } = fakePi({ steering: [], followUp: ["f1", "f2"] });
+    const input = document.getElementById("input") as HTMLTextAreaElement;
+    input.value = "draft";
+    await app.queueAction(0, "edit");
+    expect(input.value).toBe("f1\n\ndraft");
+    expect(pi()).toEqual({ steering: [], followUp: ["f2"] });
+  });
+
+  it("falls back to a text match, and requeues unchanged with a toast when the item is gone", async () => {
+    const { app, pi, setPi } = fakePi({ steering: [], followUp: ["a", "b"] });
+    setPi({ steering: [], followUp: ["b"] });
+    await app.queueAction(1, "cancel");
+    expect(pi()).toEqual({ steering: [], followUp: [] });
+
+    setPi({ steering: [], followUp: ["c", "d"] });
+    app.queue = { steering: [], followUp: ["z"] };
+    await app.queueAction(0, "cancel");
+    expect(pi()).toEqual({ steering: [], followUp: ["c", "d"] });
+    app.render();
+    expect(document.getElementById("transcript")?.textContent).toContain("Queue changed, try again");
+  });
+
+  it("puts failed and remaining texts into the composer when a requeue fails", async () => {
+    const { app } = fakePi({ steering: ["s1"], followUp: ["f1", "f2", "f3"] }, "f1");
+    const input = document.getElementById("input") as HTMLTextAreaElement;
+    input.value = "draft";
+    await app.queueAction(0, "cancel");
+    expect(input.value).toBe("f1\n\nf2\n\nf3\n\ndraft");
+    expect(app.queueBusy).toBe(false);
+  });
+
+  it("Esc pops the last queued item into the composer", async () => {
+    const { app, pi } = fakePi({ steering: ["s1"], followUp: ["f1"] });
+    const input = document.getElementById("input") as HTMLTextAreaElement;
+    // Called directly: document-level capture listeners from earlier tests' apps can swallow a dispatched Esc.
+    expect(app.popQueue()).toBe(true);
+    await vi.waitFor(() => expect(input.value).toBe("f1"));
+    expect(pi()).toEqual({ steering: ["s1"], followUp: [] });
+    expect(app.queueBusy).toBe(false);
+  });
+
+  it("renders Edit, Cancel and Send now buttons, hiding Send now on steer items", () => {
+    const { app } = fakePi({ steering: ["s1"], followUp: ["f1"] });
+    app.renderQueue();
+    const chips = document.querySelectorAll("#queue-chips .queue-chip");
+    expect([...chips[0]!.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"))).toEqual(["Edit", "Cancel"]);
+    expect([...chips[1]!.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"))).toEqual(["Edit", "Cancel", "Send now"]);
   });
 });

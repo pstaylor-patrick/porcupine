@@ -595,3 +595,5 @@ details > :not(summary) { padding: 0 12px 10px; }
 .ask-step[data-done="true"]::before { content: "\2713\00a0"; }
 .ask-step[aria-selected="true"] { background: var(--user); border-color: var(--accent); color: var(--fg); }
 .ask-wizard .question[hidden] { display: none; }
+.queue-actions { display: inline-flex; gap: 4px; margin-left: auto; }
+.queue-action { min-width: 32px; min-height: 32px; padding: 0 8px; font-size: 14px; line-height: 1; }

@@ -53,10 +53,58 @@ export function chipLabel(text: string): { body: string; files: string[] } {
   return { body: parsed.text.trim(), files: parsed.attachments.map((a) => a.name) };
 }
 
-/** Renders read-only chips into the container; hides it when the queue is empty. */
-export function renderQueueChips(container: HTMLElement, items: QueueItem[]): void {
+/** The chip a user acted on: its kind, its index within that kind, and the text it showed. */
+export interface QueueTarget {
+  kind: QueueKind;
+  index: number;
+  text: string;
+}
+
+/** The pi item at items[i] as a target (index counted within its kind), or null for held items. */
+export function targetAt(items: QueueItem[], i: number): QueueTarget | null {
+  const it = items[i];
+  if (!it || it.pending) return null;
+  const index = items.slice(0, i).filter((x) => !x.pending && x.kind === it.kind).length;
+  return { kind: it.kind, index, text: it.text };
+}
+
+export interface RewritePlan {
+  /** Items to re-add after clear_queue, in order. */
+  next: QueueItem[];
+  /** The text taken out of the queue, or null when the target was not found (queue changed). */
+  removed: string | null;
+}
+
+/**
+ * Maps the target onto the cleared queue (index within kind, then first text match in that kind)
+ * and returns what to requeue. With no match everything is requeued unchanged.
+ */
+export function planRewrite(cleared: PiQueue, target: QueueTarget, promote = false): RewritePlan {
+  const items = itemsFromQueue(cleared, []);
+  const arr = target.kind === "steer" ? cleared.steering : cleared.followUp;
+  const within = arr[target.index] === target.text ? target.index : arr.indexOf(target.text);
+  if (within < 0) return { next: items, removed: null };
+  const offset = target.kind === "steer" ? 0 : cleared.steering.length;
+  return { next: requeuePlan(items, offset + within, promote), removed: target.text };
+}
+
+export interface ChipActions {
+  edit(i: number): void;
+  cancel(i: number): void;
+  sendNow(i: number): void;
+}
+
+function chipButton(label: string, glyph: string, onClick: () => void, disabled: boolean, extra = ""): HTMLButtonElement {
+  const b = el("button", { type: "button", class: `queue-action secondary${extra}`, "aria-label": label, title: label }, glyph);
+  b.disabled = disabled;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+/** Renders chips into the container; hides it when the queue is empty. Actions add Edit, Cancel and Send now buttons. */
+export function renderQueueChips(container: HTMLElement, items: QueueItem[], actions?: ChipActions, disabled = false): void {
   container.replaceChildren(
-    ...items.map((it) => {
+    ...items.map((it, i) => {
       const { body, files } = chipLabel(it.text);
       const chip = el("li", { class: "queue-chip", "data-kind": it.kind });
       if (it.kind === "steer") chip.append(el("span", { class: "queue-marker" }, "steer"));
@@ -66,6 +114,12 @@ export function renderQueueChips(container: HTMLElement, items: QueueItem[]): vo
       }
       chip.append(el("span", { class: "queue-body" }, body));
       if (files.length) chip.append(el("span", { class: "queue-files" }, ...files.map((f) => el("span", { class: "queue-file" }, f))));
+      if (actions) {
+        const bar = el("span", { class: "queue-actions" });
+        bar.append(chipButton("Edit", "\u270E", () => actions.edit(i), disabled), chipButton("Cancel", "\u2715", () => actions.cancel(i), disabled));
+        if (it.kind !== "steer" && !it.pending) bar.append(chipButton("Send now", "\u2191", () => actions.sendNow(i), disabled));
+        chip.append(bar);
+      }
       return chip;
     }),
   );

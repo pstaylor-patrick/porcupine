@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import { ATTACH_HEADER } from "../src/attachments.js";
-import { chipLabel, itemsFromQueue, parseQueue, renderQueueChips, requeuePlan, restoreText } from "../src/queue.js";
+import { chipLabel, itemsFromQueue, parseQueue, planRewrite, renderQueueChips, requeuePlan, restoreText, targetAt } from "../src/queue.js";
 
 const q = { steering: ["s1"], followUp: ["f1", "f2"] };
 
@@ -72,5 +72,28 @@ describe("renderQueueChips", () => {
     renderQueueChips(box, []);
     expect(box.hidden).toBe(true);
     expect(box.children).toHaveLength(0);
+  });
+});
+
+describe("planRewrite", () => {
+  it("maps by index within kind, then first text match, else requeues unchanged", () => {
+    const cleared = { steering: ["s"], followUp: ["x", "y", "x"] };
+    expect(planRewrite(cleared, { kind: "followUp", index: 2, text: "x" })).toEqual({
+      next: [
+        { kind: "steer", text: "s" },
+        { kind: "followUp", text: "x" },
+        { kind: "followUp", text: "y" },
+      ],
+      removed: "x",
+    });
+    expect(planRewrite(cleared, { kind: "followUp", index: 1, text: "x" }).next.map((i) => i.text)).toEqual(["s", "y", "x"]);
+    const gone = planRewrite(cleared, { kind: "followUp", index: 0, text: "q" });
+    expect(gone.removed).toBeNull();
+    expect(gone.next).toHaveLength(4);
+  });
+  it("targetAt counts within kind and skips held items", () => {
+    const items = itemsFromQueue({ steering: ["s"], followUp: ["a", "b"] }, ["h"]);
+    expect(targetAt(items, 2)).toEqual({ kind: "followUp", index: 1, text: "b" });
+    expect(targetAt(items, 3)).toBeNull();
   });
 });

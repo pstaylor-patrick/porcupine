@@ -53,7 +53,7 @@ import {
   type RecentStorage,
   type SheetState,
 } from "./models.js";
-import { emptyQueue, itemsFromQueue, parseQueue, renderQueueChips, restoreText, type PiQueue } from "./queue.js";
+import { emptyQueue, itemsFromQueue, parseQueue, planRewrite, renderQueueChips, restoreText, targetAt, type PiQueue, type QueueItem, type QueueTarget } from "./queue.js";
 import { Connection, type PiResponse, type ServerFrame, type SessionInfo } from "./ws.js";
 import { disablePush, enablePush, getNotifyPrefs, pushHint, pushState, setNotifyPref, type NotifyPrefs } from "./push.js";
 
@@ -63,7 +63,8 @@ export function appTitle(): string {
 
 export interface ComposerActions {
   send(): void;
-  abort(): void;
+  /** Esc: pop the last queued message into the composer; returns false when nothing is queued. */
+  popQueue(): boolean;
 }
 
 /** Overlays close in this order on Esc: the topmost one wins. */
@@ -80,12 +81,16 @@ export const APP_VERSION: string = typeof __APP_VERSION__ === "string" ? __APP_V
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
-/** Enter sends, Shift+Enter inserts a newline, Esc aborts (open overlays take Esc first, see App.bind). Returns true when the key was handled. */
+/**
+ * Enter sends, Shift+Enter inserts a newline. Esc never aborts: it pops the last queued message into
+ * the composer, or blurs the input when nothing is queued (open overlays take Esc first, see App.bind).
+ * Returns true when the key was handled.
+ */
 export function handleComposerKey(e: KeyboardEvent, actions: ComposerActions): boolean {
   if (e.isComposing) return false;
   if (e.key === "Escape") {
     e.preventDefault();
-    actions.abort();
+    if (!actions.popQueue() && e.target instanceof HTMLElement) e.target.blur();
     return true;
   }
   if (e.key === "Enter" && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
@@ -146,6 +151,8 @@ export class App {
   readonly dialogs = new DialogQueue();
   /** pi's queue, mirrored from queue_update (last write wins; the reset snapshot replays it). */
   queue: PiQueue = emptyQueue();
+  /** A clear-and-requeue is in flight; chip actions and Esc pops wait for it. */
+  queueBusy = false;
   readonly statusPanel = new StatusPanel();
   private mergeMode: MergeModePicker | null = null;
   /** The dialog shown in the sheet; hiding the sheet keeps it pending. */
@@ -181,6 +188,10 @@ export class App {
       onFrame: (f: ServerFrame) => this.onFrame(f),
       onStatus: (s: "connecting" | "open" | "closed") => {
         this.connState = s;
+        if (s === "open" && this.queueBusy) {
+          this.queueBusy = false;
+          this.renderQueue();
+        }
         const label = s === "open" ? "Connected" : s === "connecting" ? "Connecting" : "Disconnected";
         $("settings-conn").textContent = label;
         if (s === "open") void this.loadUsage();
@@ -201,7 +212,7 @@ export class App {
       e.preventDefault();
       void this.send();
     });
-    // Capture phase: an open overlay swallows Esc before the composer can turn it into an abort.
+    // Capture phase: an open overlay swallows Esc before the composer can pop the queue.
     document.addEventListener(
       "keydown",
       (e) => {
@@ -215,7 +226,7 @@ export class App {
     );
     this.input.addEventListener("keydown", (e) => {
       if (this.commandMenu.handleKey(e)) return;
-      handleComposerKey(e, { send: () => void this.send(), abort: () => void this.abort() });
+      handleComposerKey(e, { send: () => void this.send(), popQueue: () => this.popQueue() });
     });
     this.input.addEventListener("input", () => {
       this.commandMenu.update();
@@ -306,9 +317,6 @@ export class App {
     });
     $("autocompact-on").addEventListener("change", (e) => {
       threshold.disabled = !(e.target as HTMLInputElement).checked;
-    });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && e.target !== this.input && document.activeElement !== this.input && this.t.isStreaming) void this.abort();
     });
     $("settings-app-version").textContent = APP_VERSION;
     this.syncOverlays();
@@ -1143,8 +1151,82 @@ export class App {
     }
   }
 
+  queueItems(): QueueItem[] {
+    return itemsFromQueue(this.queue, []);
+  }
+
   renderQueue(): void {
-    renderQueueChips($("queue-chips"), itemsFromQueue(this.queue, []));
+    const disabled = this.queueBusy || this.conn.sessionId === null || this.connState === "closed";
+    renderQueueChips(
+      $("queue-chips"),
+      this.queueItems(),
+      {
+        edit: (i) => void this.queueAction(i, "edit"),
+        cancel: (i) => void this.queueAction(i, "cancel"),
+        sendNow: (i) => void this.queueAction(i, "sendNow"),
+      },
+      disabled,
+    );
+  }
+
+  /** Esc: pops the last queued item into the composer. Returns false when nothing is queued. */
+  popQueue(): boolean {
+    const items = this.queueItems();
+    if (items.length === 0) return false;
+    if (!this.queueBusy) void this.queueAction(items.length - 1, "edit");
+    return true;
+  }
+
+  async queueAction(i: number, op: "edit" | "cancel" | "sendNow"): Promise<void> {
+    if (this.queueBusy || !this.conn.sessionId) return;
+    const target = targetAt(this.queueItems(), i);
+    if (!target) return;
+    const removed = await this.rewriteQueue(target, op === "sendNow");
+    if (removed !== null && op === "edit") this.prependDraft(removed);
+  }
+
+  private prependDraft(text: string): void {
+    this.input.value = [text, this.input.value].filter((s) => s.trim() !== "").join("\n\n");
+    this.autogrow();
+    this.queueRender();
+    this.input.focus();
+  }
+
+  /**
+   * clear_queue, then re-adds the cleared items in order (steer / follow_up, one at a time) minus the
+   * target, or with it promoted to a leading steer. Works from the cleared response, not local chips,
+   * so items another device added survive. Chips re-render from pi's queue_update events.
+   * Returns the removed text, or null when nothing was removed.
+   */
+  async rewriteQueue(target: QueueTarget, promote = false): Promise<string | null> {
+    this.queueBusy = true;
+    this.renderQueue();
+    try {
+      const cleared = await this.conn.command({ type: "clear_queue" });
+      if (!cleared.success) {
+        this.notice("error", `queue: ${cleared.error ?? "clear failed"}`);
+        return null;
+      }
+      const plan = planRewrite(parseQueue(isRec(cleared.data) ? cleared.data : {}), target, promote);
+      if (plan.removed === null) this.notice("warn", "Queue changed, try again");
+      for (let k = 0; k < plan.next.length; k++) {
+        const item = plan.next[k] as QueueItem;
+        const r = await this.conn.command(item.kind === "steer" ? { type: "steer", message: item.text } : { type: "follow_up", message: item.text });
+        if (!r.success) {
+          const rest = plan.next.slice(k);
+          const lost = { steering: rest.filter((x) => x.kind === "steer").map((x) => x.text), followUp: rest.filter((x) => x.kind === "followUp").map((x) => x.text) };
+          this.input.value = restoreText(lost, this.input.value);
+          this.autogrow();
+          this.notice("error", `queue: ${r.error ?? "requeue failed"}`);
+          break;
+        }
+      }
+      return plan.removed;
+    } finally {
+      this.queueBusy = false;
+      this.renderQueue();
+      this.queueRender();
+    }
   }
 
   renderStatusPanel(): void {
