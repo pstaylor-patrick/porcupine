@@ -126,8 +126,8 @@ export async function handleMergeMode(req: IncomingMessage, res: ServerResponse,
     try {
       json(res, 200, { sessionId: cfId, ...(await readMergeMode(ctx, cfId)) });
     } catch (e) {
-      ctx.log(`merge-mode read failed: ${(e as Error).message}`);
-      json(res, 502, { error: `cf: ${(e as Error).message}` });
+      ctx.log(`merge-mode read failed: ${(e instanceof Error ? e.message : String(e))}`);
+      json(res, 502, { error: `cf: ${(e instanceof Error ? e.message : String(e))}` });
     }
     return true;
   }
@@ -159,8 +159,8 @@ export async function handleMergeMode(req: IncomingMessage, res: ServerResponse,
       await writeMergeMode(ctx, cfId, mode);
       json(res, 200, { sessionId: cfId, ...(await readMergeMode(ctx, cfId)) });
     } catch (e) {
-      ctx.log(`merge-mode write failed: ${(e as Error).message}`);
-      json(res, 502, { error: `cf: ${(e as Error).message}` });
+      ctx.log(`merge-mode write failed: ${(e instanceof Error ? e.message : String(e))}`);
+      json(res, 502, { error: `cf: ${(e instanceof Error ? e.message : String(e))}` });
     }
     return true;
   }

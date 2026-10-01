@@ -37,7 +37,7 @@ export default function claudeSkills(pi: Api, opts: SkillsOptions = {}): void {
         try {
           text = skillPrompt(skill, args, avail);
         } catch (e) {
-          ctx.ui?.notify(`skill ${skill.name} unreadable: ${(e as Error).message}`, "error");
+          ctx.ui?.notify(`skill ${skill.name} unreadable: ${(e instanceof Error ? e.message : String(e))}`, "error");
           return;
         }
         const idle = ctx.isIdle?.() ?? true;

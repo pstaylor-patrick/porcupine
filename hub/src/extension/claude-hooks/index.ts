@@ -54,6 +54,11 @@ export interface BridgeOptions {
   cwd?: string;
 }
 
+/** A tool call's input as a record; arrays and primitives become empty. */
+function toolInput(raw: unknown): Rec {
+  return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Rec) : {};
+}
+
 export default function claudeHooks(pi: Api, opts: BridgeOptions = {}): void {
   const env = opts.env ?? process.env;
   const source = new HooksSource(opts.settingsPath ?? join(env.HOME ?? homedir(), ".claude", "settings.json"));
@@ -127,7 +132,7 @@ export default function claudeHooks(pi: Api, opts: BridgeOptions = {}): void {
   pi.on("tool_call", async (event, ctx) => {
     const piName = typeof event.toolName === "string" ? event.toolName : "";
     const name = claudeToolName(piName);
-    const input = event.input && typeof event.input === "object" ? (event.input as Rec) : {};
+    const input = toolInput(event.input);
     const out = await fire(ctx, "PreToolUse", name, { tool_name: name, tool_input: claudeToolInput(piName, input), tool_use_id: event.toolCallId });
     if (!out) return undefined;
     if (out.decision === "deny" || out.decision === "block") return { block: true, reason: out.reason };
@@ -145,7 +150,7 @@ export default function claudeHooks(pi: Api, opts: BridgeOptions = {}): void {
   pi.on("tool_result", async (event, ctx) => {
     const piName = typeof event.toolName === "string" ? event.toolName : "";
     const name = claudeToolName(piName);
-    const input = event.input && typeof event.input === "object" ? (event.input as Rec) : {};
+    const input = toolInput(event.input);
     const out = await fire(ctx, "PostToolUse", name, {
       tool_name: name,
       tool_input: claudeToolInput(piName, input),
