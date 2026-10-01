@@ -42,6 +42,10 @@ describe("questions", () => {
       const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
       expect(submit?.disabled).toBe(true);
       click(form, 'input[name="q0"]', 0);
+      expect(submit?.textContent).toBe("Next");
+      (form as HTMLFormElement).requestSubmit();
+      expect(submit?.textContent).toBe("Submit");
+      expect(form.querySelectorAll<HTMLElement>("fieldset")[0]?.hidden).toBe(true);
       click(form, 'input[name="q1"]', 1);
       const other = form.querySelectorAll<HTMLInputElement>(".other-text")[1] as HTMLInputElement;
       other.value = "C";

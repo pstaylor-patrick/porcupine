@@ -192,23 +192,62 @@ function questionField(q: AskQuestion, name: string, changed: () => void): { set
   return { set, read };
 }
 
+/**
+ * A wizard: one question per step, with tabs across the top like Claude Code.
+ * Picking a single-select option moves on; the last step's button submits.
+ */
 function renderAsk(d: Extract<Dialog, { kind: "ask" }>, answer: Answer): Rendered {
-  const form = el("form", { class: "dialog-form" });
-  const submit = button("Submit", "primary", "submit");
+  const form = el("form", { class: "dialog-form ask-wizard" });
+  const n = d.questions.length;
+  let step = 0;
+  const next = button("Next", "primary", "submit");
+  const back = button("Back", "secondary");
+  const tabs = el("div", { class: "ask-steps", role: "tablist" });
+  const tabButtons = d.questions.map((q, i) => {
+    const t = el("button", { type: "button", class: "ask-step", role: "tab" }, q.header || `Q${String(i + 1)}`);
+    t.addEventListener("click", () => go(i));
+    return t;
+  });
+  tabs.append(...tabButtons);
   const sync = (): void => {
-    submit.disabled = fields.some((f) => !f.read());
+    fields.forEach((f, i) => {
+      f.set.hidden = i !== step;
+      const t = tabButtons[i];
+      if (!t) return;
+      t.setAttribute("aria-selected", String(i === step));
+      t.dataset.done = String(f.read() !== "");
+    });
+    const last = step === n - 1;
+    next.textContent = last ? "Submit" : "Next";
+    next.disabled = last ? fields.some((f) => !f.read()) : !fields[step]?.read();
+    back.hidden = step === 0;
   };
-  const fields = d.questions.map((q, i) => questionField(q, `q${i}`, sync));
+  const go = (i: number): void => {
+    step = Math.max(0, Math.min(n - 1, i));
+    sync();
+    fields[step]?.set.querySelector<HTMLElement>("input")?.focus({ preventScroll: true });
+  };
+  const fields = d.questions.map((q, i) =>
+    questionField(q, `q${String(i)}`, () => {
+      sync();
+      // A single choice is the whole answer; typed Other waits for Next.
+      const picked = fields[i]?.set.querySelector<HTMLInputElement>(`input[name="q${String(i)}"]:checked`);
+      if (!q.multiSelect && picked && picked.value !== OTHER && i === step && i < n - 1) setTimeout(() => go(i + 1), 150);
+    }),
+  );
+  back.addEventListener("click", () => go(step - 1));
+  if (n > 1) form.append(tabs);
   form.append(...fields.map((f) => f.set));
   sync();
   onSubmit(form, () => {
-    if (submit.disabled) return;
+    if (next.disabled) return;
+    if (step < n - 1) return go(step + 1);
     const answers: Record<string, string> = {};
     d.questions.forEach((q, i) => (answers[q.question] = fields[i]?.read() ?? ""));
     answer({ type: "extension_ui_response", id: d.id, value: JSON.stringify({ answers }) });
   });
-  form.append(el("div", { class: "dialog-actions" }, dismissButton(d.id, answer), submit));
-  return { title: d.questions.length > 1 ? "Questions" : "Question", body: form };
+  form.append(el("div", { class: "dialog-actions" }, dismissButton(d.id, answer), back, next));
+  return { title: n > 1 ? "Questions" : "Question", body: form };
 }
 
 /** Builds the form for one dialog. `answer` fires at most once, so a double tap sends one reply. */

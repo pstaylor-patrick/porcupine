@@ -580,3 +580,10 @@ details > :not(summary) { padding: 0 12px 10px; }
   background: linear-gradient(var(--bg) calc(100% - 16px), transparent);
   pointer-events: none;
 }
+/* ask_user_question wizard: one question per step. */
+.ask-steps { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.ask-step { flex: none; min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); font-size: 0.8em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
+.ask-step[data-done="true"] { color: var(--fg); }
+.ask-step[data-done="true"]::before { content: "\2713\00a0"; }
+.ask-step[aria-selected="true"] { background: var(--user); border-color: var(--accent); color: var(--fg); }
+.ask-wizard .question[hidden] { display: none; }
