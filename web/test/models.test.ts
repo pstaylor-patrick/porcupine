@@ -377,3 +377,88 @@ describe("model picker vendor rail", () => {
     expect(document.querySelectorAll("#model-groups details")).toHaveLength(3);
   });
 });
+
+describe("900px breakpoint crossing", () => {
+  const models = [
+    { provider: "g", id: "anthropic/claude-opus-5.5", reasoning: true, input: ["text"] },
+    { provider: "g", id: "openai/gpt-5", reasoning: true, input: ["text"] },
+  ];
+  async function setup() {
+    let desktop = false;
+    const listeners: (() => void)[] = [];
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (q: string) =>
+        ({
+          get matches() {
+            return desktop;
+          },
+          media: q,
+          addEventListener: (_: string, fn: () => void) => listeners.push(fn),
+          removeEventListener() {},
+        }) as unknown as MediaQueryList,
+    );
+    localStorage.clear();
+    loadShell();
+    const conn = new Connection(
+      { url: "ws://x/ws", storage: null },
+      { onFrame: () => undefined, onStatus: () => undefined },
+    );
+    vi.spyOn(conn, "command").mockImplementation((cmd) =>
+      Promise.resolve(
+        cmd.type === "get_available_models"
+          ? { success: true, data: { models } }
+          : { success: true },
+      ),
+    );
+    const app = new App(conn);
+    app.bind();
+    conn.sessionId = "s1";
+    const cross = (to: boolean) => {
+      desktop = to;
+      for (const fn of listeners) fn();
+    };
+    return { app, cross };
+  }
+  const byId = (id: string) => document.getElementById(id) as HTMLElement;
+  const esc = () =>
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+  it("keeps the open sheet, switches picker mode, and Esc still closes", async () => {
+    const { app, cross } = await setup();
+    app.openSheet();
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll("#model-groups .model-option").length).toBeGreaterThan(0),
+    );
+    expect(document.querySelectorAll("#model-groups details").length).toBeGreaterThan(0);
+    cross(true);
+    expect(app.overlays).toEqual(["sheet"]);
+    expect(document.querySelectorAll("#model-groups .vendor-tab").length).toBeGreaterThan(0);
+    expect(document.querySelectorAll("#model-groups details")).toHaveLength(0);
+    expect(byId("sheet").contains(document.activeElement)).toBe(true);
+    cross(false);
+    expect(app.overlays).toEqual(["sheet"]);
+    expect(document.querySelectorAll("#model-groups details").length).toBeGreaterThan(0);
+    esc();
+    expect(app.overlays).toEqual([]);
+  });
+
+  it("keeps Settings open and swaps sections and the back button", async () => {
+    const { app, cross } = await setup();
+    const panels = ["general", "notifications", "usage", "budgets"];
+    app.openSettings();
+    expect(panels.every((p) => !byId(`settings-${p}`).hidden)).toBe(true);
+    expect(byId("settings-back").getAttribute("aria-label")).toBe("Sessions");
+    cross(true);
+    expect(app.overlays).toEqual(["settings"]);
+    expect(panels.filter((p) => !byId(`settings-${p}`).hidden)).toEqual(["general"]);
+    expect(byId("settings-back").getAttribute("aria-label")).toBe("Close settings");
+    expect(byId("scrim").hidden).toBe(false);
+    expect(byId("settings").contains(document.activeElement)).toBe(true);
+    cross(false);
+    expect(app.overlays).toEqual(["settings"]);
+    expect(panels.every((p) => !byId(`settings-${p}`).hidden)).toBe(true);
+    expect(byId("settings-back").getAttribute("aria-label")).toBe("Sessions");
+    esc();
+    expect(app.overlays).toEqual([]);
+  });
+});

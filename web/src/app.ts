@@ -394,6 +394,11 @@ export class App {
         next.focus();
       });
     }
+    // Crossing 900px swaps layouts in place; open overlays stay open.
+    if (typeof window.matchMedia === "function")
+      window
+        .matchMedia("(min-width: 900px)")
+        .addEventListener?.("change", () => this.onBreakpointChange());
     $("logout").addEventListener("click", () => void this.logout());
     $("reload-app").addEventListener("click", () => void reloadLatest());
     $("push-toggle").addEventListener(
@@ -607,6 +612,19 @@ export class App {
       if (show) svg.removeAttribute("hidden");
       else svg.setAttribute("hidden", "");
     }
+  }
+
+  /** Re-renders layout-dependent pieces after the 900px breakpoint flips, keeping the overlay stack. */
+  onBreakpointChange(): void {
+    this.syncSettingsMode();
+    this.renderModels();
+    this.syncOverlays();
+    const top = this.overlays[this.overlays.length - 1];
+    if (!top) return;
+    const el = this.overlayElement(top);
+    if (el.contains(document.activeElement)) return;
+    const first = el.querySelector<HTMLElement>(FOCUSABLE);
+    (first ?? el).focus();
   }
 
   private syncOverlays(): void {
