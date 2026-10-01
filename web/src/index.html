@@ -48,12 +48,17 @@
           <span id="budget-banner-text"></span>
           <button id="budget-banner-close" type="button" class="icon-button" aria-label="Dismiss budget warning">&#x2715;</button>
         </div>
+        <div id="retry-banner" class="budget-banner retry-banner" role="status" hidden>
+          <span id="retry-banner-text"></span>
+          <button id="abort-retry" type="button" class="secondary">Stop retrying</button>
+        </div>
         <div id="transcript" class="transcript" aria-label="Transcript"></div>
         <div id="empty" hidden class="empty scribble scene"><svg class="crayon crayon-scribble" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"><path pathLength="1" d="M-10 62C58 18 120 96 176 54S292 8 338 70S402 130 412 96"/><path pathLength="1" d="M18 250C64 180 30 120 96 104S204 168 246 120S300 20 362 44S398 176 330 214S214 238 170 280"/><path pathLength="1" d="M40 -6C92 60 70 148 138 176S250 214 298 160S352 72 410 150"/><path pathLength="1" d="M-6 170C46 150 70 214 128 222S226 170 262 218S330 300 408 262"/><path pathLength="1" d="M210 -8C182 40 236 76 214 118S150 196 206 236S290 254 300 310"/><path pathLength="1" d="M120 14C170 30 150 90 208 88S266 34 304 110C328 158 270 186 236 178"/></svg><p class="scribble-panel">No session attached. Start one in a tmux pane with <code>porcupine</code>.</p></div>
       </main>
       <button id="dialog-reopen" type="button" class="dialog-reopen" hidden>pi is waiting for your answer</button>
       <form id="composer" class="composer" autocomplete="off">
         <button id="jump-bottom" type="button" class="jump-bottom" aria-label="Jump to latest" hidden><svg width="20" height="20" aria-hidden="true" focusable="false" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/></svg></button>
+        <ul id="command-menu" class="command-menu" role="listbox" aria-label="Commands" hidden></ul>
         <div id="status-panel" class="status-panel" aria-label="Extension status" hidden></div>
         <div id="attach-confirm" class="attach-confirm" role="alertdialog" aria-labelledby="attach-confirm-title" hidden></div>
         <div id="attachments" class="attachments" hidden></div>
@@ -61,7 +66,7 @@
         <input id="file-input" type="file" multiple hidden accept="image/*,application/pdf,audio/*,video/*,.m4a,.mp3,.wav,.ogg,.opus,.aac,.flac,.amr,.caf,.mp4,.mov,.webm,.mkv,.m4v,text/*,.md,.json,.csv" />
         <div id="attach-status" class="attach-status" role="status" aria-live="polite" hidden></div>
         <label class="visually-hidden" for="input">Message</label>
-        <textarea id="input" rows="1" placeholder="Message pi" enterkeyhint="send"></textarea>
+        <textarea id="input" rows="1" role="combobox" aria-autocomplete="list" aria-controls="command-menu" aria-expanded="false" placeholder="Message pi" enterkeyhint="send"></textarea>
         <button id="send" type="submit" class="primary icon-send" aria-label="Send"><svg width="20" height="20" aria-hidden="true" focusable="false" viewBox="0 0 256 256" fill="currentColor"><path d="M231.87,114l-168-95.89A16,16,0,0,0,40.92,37.34L71.55,128,40.92,218.67A16,16,0,0,0,56,240a16.15,16.15,0,0,0,7.93-2.1l167.92-96.05a16,16,0,0,0,.05-27.89ZM56,224a.56.56,0,0,0,0-.12L85.74,136H144a8,8,0,0,0,0-16H85.74L56.06,32.16A.46.46,0,0,0,56,32l168,95.83Z"/></svg></button>
         <button id="abort" type="button" class="danger icon-send" aria-label="Stop" hidden><svg width="20" height="20" aria-hidden="true" focusable="false" viewBox="0 0 256 256" fill="currentColor"><path d="M216,56V200a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V56A16,16,0,0,1,56,40H200A16,16,0,0,1,216,56Z"/></svg></button>
       </form>
@@ -143,6 +148,24 @@
             <button id="autocompact-save" type="button" class="secondary">Save</button>
           </div>
           <p id="autocompact-hint" class="field-hint">Tokens. Leave empty for the default.</p>
+        </div>
+        <div class="field" id="history-block">
+          <span class="field-label" id="history-label">History</span>
+          <ul id="history-list" class="history-list" aria-labelledby="history-label"></ul>
+          <label class="visually-hidden" for="session-name-input">Session name</label>
+          <div class="context-row">
+            <input id="session-name-input" type="text" autocomplete="off" placeholder="Session name" />
+            <button id="session-rename" type="button" class="secondary">Rename</button>
+          </div>
+          <label class="visually-hidden" for="switch-path-input">Session file to open</label>
+          <div class="context-row">
+            <input id="switch-path-input" type="text" autocomplete="off" spellcheck="false" placeholder="/path/to/session.jsonl" />
+            <button id="session-switch" type="button" class="secondary">Switch</button>
+          </div>
+          <div class="context-row">
+            <button id="session-clone" type="button" class="secondary">Clone conversation</button>
+          </div>
+          <p id="history-status" class="field-hint" role="status" aria-live="polite"></p>
         </div>
         <div class="sheet-actions">
           <button id="compact-now" type="button" class="secondary">Compact now</button>

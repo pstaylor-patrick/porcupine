@@ -13,6 +13,8 @@ const HOOKS_EXTENSION = fileURLToPath(new URL("../extension/claude-hooks/index.j
 const SKILLS_EXTENSION = fileURLToPath(new URL("../extension/claude-skills/index.js", import.meta.url));
 const LOOP_EXTENSION = fileURLToPath(new URL("../extension/loop/index.js", import.meta.url));
 const SUBAGENT_EXTENSION = fileURLToPath(new URL("../extension/subagent/index.js", import.meta.url));
+const PLAN_MODE_EXTENSION = fileURLToPath(new URL("../extension/plan-mode/index.js", import.meta.url));
+const TODO_EXTENSION = fileURLToPath(new URL("../extension/todo/index.js", import.meta.url));
 
 function loadEnvFile(path: string): Record<string, string> {
   try {
@@ -41,7 +43,7 @@ async function main(): Promise<void> {
     name: resolveName({ explicit: args.name, env: process.env, cwd }),
     cwd,
     piBin: process.env.PORCUPINE_PI_BIN ?? "pi",
-    piArgs: buildPiArgs(args.piArgs, [ASK_EXTENSION, AUTOCOMPACT_EXTENSION, HOOKS_EXTENSION, SKILLS_EXTENSION, LOOP_EXTENSION, SUBAGENT_EXTENSION], resolveDefaults(childEnv)),
+    piArgs: buildPiArgs(args.piArgs, [ASK_EXTENSION, AUTOCOMPACT_EXTENSION, HOOKS_EXTENSION, SKILLS_EXTENSION, LOOP_EXTENSION, SUBAGENT_EXTENSION, PLAN_MODE_EXTENSION, TODO_EXTENSION], resolveDefaults(childEnv)),
     childEnv,
     runtimeDir: resolveRuntimeDir({ env: process.env }),
     log,

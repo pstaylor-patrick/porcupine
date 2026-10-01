@@ -77,6 +77,28 @@ Settings come from the process environment or the env file
 | `OPENAI_API_KEY` | | Optional; serves OpenAI models from the OpenAI API |
 | `PORCUPINE_MODEL` | | Overrides the default model for new sessions, as a `vendor/model` id; routed like any other |
 | `PORCUPINE_RUNTIME_DIR` | `$XDG_RUNTIME_DIR/porcupine` | Session sockets |
+| `PORCUPINE_AUTOCOMPACT_TOKENS` | `250000` | Compact a session once its context reaches this many tokens; `off` disables it |
+| `PORCUPINE_AUTOCOMPACT_FALLBACK_PCT` | `80` | For models whose context window is at or below the token threshold, compact at this percent of the window instead |
+| `PORCUPINE_CONFIRM_USD` | `0.5` | Attachment cost estimate that asks before spending |
+| `PORCUPINE_CONFIRM_MINUTES` | `10` | Audio or video length that asks before transcribing |
+| `PORCUPINE_VAPID_SUBJECT` | `mailto:porcupine@localhost` | Contact sent to Web Push services |
+| `PORCUPINE_CF_BIN` | `~/.claude/cf/bin` | cf scripts used by the merge-mode picker |
+| `PORCUPINE_RUBY` | `ruby` | Ruby used to run those scripts |
+| `PORCUPINE_PI_BIN` | `pi` | pi binary for sessions and subagents |
+| `PORCUPINE_WHISPER_BIN`, `PORCUPINE_WHISPER_MODEL` | | whisper.cpp binary and model, see Install |
+
+### Data files
+
+| Path | Contents |
+|---|---|
+| `${XDG_CONFIG_HOME:-~/.config}/porcupine/.env` | Settings and keys (never commit it) |
+| `${XDG_CONFIG_HOME:-~/.config}/porcupine/vapid.json` | Web Push keys, mode 0600 |
+| `${XDG_DATA_HOME:-~/.local/share}/porcupine/usage.jsonl` | Append-only usage ledger, one row per model response |
+| `${XDG_DATA_HOME:-~/.local/share}/porcupine/budgets.json` | Budgets edited in Settings |
+| `${XDG_DATA_HOME:-~/.local/share}/porcupine/budget-state.json` | Which 80%/100% warnings already fired this period |
+| `${XDG_DATA_HOME:-~/.local/share}/porcupine/backfill.done` | Marker: the one-time usage backfill from `~/.pi/agent/sessions` ran |
+| `${XDG_DATA_HOME:-~/.local/share}/porcupine/push-subscriptions.json` | Web Push subscriptions |
+| `${XDG_DATA_HOME:-~/.local/share}/porcupine/uploads/` | Attachments, kept 30 days |
 
 Each model comes from exactly one provider. Anthropic models come only from the
 Anthropic API and OpenAI models only from the OpenAI API; without their key they
@@ -142,6 +164,86 @@ Settings > Notifications turns on Web Push for the current device. You get a not
 - The hub generates VAPID keys once into `${XDG_CONFIG_HOME:-~/.config}/porcupine/vapid.json` (mode 0600). Keep that file: replacing it invalidates every subscription. Set `PORCUPINE_VAPID_SUBJECT` (for example `mailto:you@example.com`) to change the contact sent to push services; the default is `mailto:porcupine@localhost`.
 - Subscriptions live in `${XDG_DATA_HOME:-~/.local/share}/porcupine/push-subscriptions.json`; ones the push service reports gone (404/410) are dropped.
 - Sessions are still started from a terminal; there is no spawn button.
+
+## Usage and budgets
+
+Every model response is recorded with its tokens and pi's cost estimate.
+Settings > Usage shows this month's spend per provider with a per-model
+breakdown and a daily chart; the session sheet shows the session's tokens,
+cost and context use. Settings > Budgets sets a monthly cap per direct
+provider, or a prepaid balance for OpenRouter (whose live key balance is shown
+when available). Crossing 80% or 100% shows a banner and sends a push
+notification; prompts are never blocked.
+
+## Session sheet
+
+- **Context:** a meter of the context window, the auto-compact threshold for
+  this session (a number of tokens, Off, or empty for the default; sent as
+  `/autocompact`), and Compact now.
+- **History:** the conversation tree. Fork here starts a new branch from a
+  message you sent and puts that message back in the box to edit. Clone copies
+  the current branch into a new session file, Switch opens another session file
+  by path, and Rename names the session.
+- **Merge mode (cf):** see below.
+
+When a provider error triggers pi's automatic retry, a banner shows the attempt
+with a Stop retrying button.
+
+Type `/` in the message box for a list of the session's commands (extension
+commands, skills and prompt templates); arrows move, Tab or Enter completes,
+Esc closes it.
+
+## Change fabric (cf) bridge
+
+cf is a first-class citizen; porcupine has no permission system of its own.
+
+- **Hooks:** the claude-hooks extension runs the hooks from
+  `~/.claude/settings.json` with Claude Code semantics: SessionStart,
+  UserPromptSubmit (output is added as context), PreToolUse (pi tools map to
+  Bash, Edit, Write and Read; exit code 2 or a deny/block decision blocks the
+  call, "ask" opens a confirm in the app), PostToolUse and Stop. A hook that
+  times out (60 s by default) or fails otherwise lets the call through with a
+  notice.
+- **Merge mode:** the session sheet reads and sets the session's cf merge mode
+  through cf's own scripts. New sessions start in cf's default.
+- **Skills:** every `~/.claude/skills/<name>/SKILL.md`, cf's included, is a
+  `/<name>` command. Claude-Code-only tools are mapped: AskUserQuestion to
+  ask_user_question, Agent to the subagent tool; Workflow is not supported and
+  the model is told so.
+
+Subagents and loops run under the parent session's cf session id, so they
+inherit its merge mode.
+
+## Loops
+
+`/loop 5m <prompt>` sends the prompt every 5 minutes (`30s`, `1h` also work);
+`/loop <prompt>` lets the model pick each delay with its `schedule_next` tool
+and end the loop with `stop_loop`; `/loop stop` ends it. A tick that lands
+while the agent is busy is queued as a follow-up. The loop shows in the status
+panel above the message box, survives `--continue`, and stops when the pane
+exits.
+
+## Subagents
+
+The `subagent` tool runs tasks in separate pi processes, one at a time, in
+parallel, or as a chain that passes each result to the next. Agents are defined
+as Markdown files in `~/.pi/agent/agents/`; a general-purpose agent is built
+in. Child models follow the same routing rules as the app, children get only
+the provider key they need, and each child's progress, output and cost appear
+as a collapsible block under the tool call in the parent transcript. A child
+cannot ask you questions; it is told to decide for itself.
+
+## Plan mode and todos
+
+`/plan` toggles plan mode: edit and write tools are off and bash only runs
+read-only commands. When the model writes a numbered `Plan:`, the app asks
+whether to execute it, and progress shows in the status panel as steps are
+marked done. `/plan-todos` lists the steps. Separately, the model can keep a
+todo list with the `todo` tool; open items show in the status panel and
+`/todos` lists them. Both are vendored from pi's MIT examples.
+
+Extension changes reach a running session when it is restarted with
+`porcupine -- --continue`.
 
 ## Optional: DNS and TLS on AWS
 

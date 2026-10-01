@@ -303,7 +303,7 @@ describe("app", () => {
     select.value = "high";
     select.dispatchEvent(new Event("change"));
     await vi.waitFor(() => expect(sent.map((c) => c.type)).toContain("set_thinking_level"));
-    expect(sent.filter((c) => c.type !== "get_session_stats" && c.type !== "get_state")).toEqual([
+    expect(sent.filter((c) => !["get_session_stats", "get_state", "get_tree"].includes(String(c.type)))).toEqual([
       { type: "get_available_models" },
       { type: "set_model", provider: "openrouter", modelId: "openai/gpt-5" },
       { type: "set_thinking_level", level: "high" },
