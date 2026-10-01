@@ -14,6 +14,36 @@ export interface Pending {
   warn?: string | undefined;
   /** Upload progress text shown in the chip, e.g. "uploading 40%". */
   progress?: string | undefined;
+  /** Started when the file is attached, so it is usually on the hub before Send. */
+  upload?: Promise<UploadInfo> | undefined;
+}
+
+/** Starts (or returns the running) upload for a pending file; a failed upload can be retried. */
+export function startUpload(p: Pending, session: string, http: Http, rerender: () => void): Promise<UploadInfo> {
+  if (p.upload) return p.upload;
+  p.progress = "uploading 0%";
+  rerender();
+  p.upload = http
+    .upload(session, p.file, (pct) => {
+      p.progress = `uploading ${String(pct)}%`;
+      rerender();
+    })
+    .then(
+      (info) => {
+        p.progress = undefined;
+        rerender();
+        return info;
+      },
+      (e: unknown) => {
+        p.upload = undefined;
+        p.progress = "upload failed";
+        rerender();
+        throw e;
+      },
+    );
+  // Send awaits this again; an unobserved failure here is reported there.
+  p.upload.catch(() => undefined);
+  return p.upload;
 }
 
 export interface UploadsConfig {
@@ -212,7 +242,8 @@ export function renderChips(container: HTMLElement, pending: readonly Pending[],
         vid.src = `${url}#t=0.1`;
         vid.muted = true;
         vid.playsInline = true;
-        vid.preload = "metadata";
+        // iOS paints no frame for "metadata"; a local blob costs nothing to load fully.
+        vid.preload = "auto";
         chip.append(vid);
       } else {
         const icon = document.createElement("span");
@@ -371,25 +402,8 @@ export interface SendContext {
 
 /** Uploads, estimates, optionally confirms, processes. Returns the final message text, or null when cancelled. */
 export async function sendWithAttachments(ctx: SendContext): Promise<string | null> {
-  const uploads: UploadInfo[] = [];
-  for (const p of ctx.pending) {
-    p.progress = "uploading 0%";
-    ctx.rerender();
-    try {
-      uploads.push(
-        await ctx.http.upload(ctx.session, p.file, (pct) => {
-          p.progress = `uploading ${pct}%`;
-          ctx.rerender();
-        }),
-      );
-      p.progress = "uploaded";
-    } catch (e) {
-      p.progress = undefined;
-      throw e;
-    } finally {
-      ctx.rerender();
-    }
-  }
+  ctx.status("Uploading attachments");
+  const uploads = await Promise.all(ctx.pending.map((p) => startUpload(p, ctx.session, ctx.http, ctx.rerender)));
   const ids = uploads.map((u) => u.id);
   ctx.status("Estimating attachments");
   const est = await ctx.http.estimate(ctx.session, ids);
@@ -455,4 +469,30 @@ export function showNotice(title: string, body: string, actions: NoticeAction[] 
   if (typeof dlg.showModal === "function") dlg.showModal();
   else dlg.setAttribute("open", "");
   return dlg;
+}
+
+export interface SentAttachment {
+  name: string;
+  kind: Kind;
+  session: string;
+  id: string;
+}
+
+const KINDS: readonly Kind[] = ["image", "pdf", "audio", "video", "text", "file"];
+
+/** Splits a sent message into the user's text and the attachments listed in its block. */
+export function parseSentMessage(text: string): { text: string; attachments: SentAttachment[] } {
+  const at = text.indexOf(`\n\n${ATTACH_HEADER}\n`);
+  if (at < 0) return { text, attachments: [] };
+  const attachments: SentAttachment[] = [];
+  for (const line of text.slice(at + ATTACH_HEADER.length + 3).split("\n")) {
+    const m = /^- (.+?) \((\w+)[,)].*?\/uploads\/([A-Za-z0-9_-]+)\/([0-9a-f-]{36})\//.exec(line);
+    const kind = KINDS.find((k) => k === m?.[2]);
+    if (m?.[1] && m[3] && m[4] && kind) attachments.push({ name: m[1], kind, session: m[3], id: m[4] });
+  }
+  return { text: text.slice(0, at), attachments };
+}
+
+export function uploadUrl(a: SentAttachment): string {
+  return `/api/uploads/file?${new URLSearchParams({ session: a.session, id: a.id }).toString()}`;
 }

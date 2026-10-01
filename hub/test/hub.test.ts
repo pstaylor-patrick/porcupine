@@ -259,6 +259,28 @@ describe("uploads", () => {
     const big = await fetch(`${base}/api/uploads?session=${s.meta.id}&name=big.bin`, { method: "POST", headers, body: "x".repeat(2048) });
     expect(big.status).toBe(413);
   });
+  it("serves an upload back with ranges; only media types render inline", async () => {
+    const s = await startFake();
+    await waitFor(() => hub.registry.list().length === 1);
+    const post = async (name: string, type: string, body: string) =>
+      (await (await fetch(`${base}/api/uploads?session=${s.meta.id}&name=${name}`, { method: "POST", headers: { Cookie: cookie(), Origin: ORIGIN, "Content-Type": type }, body })).json()) as { id: string };
+    const vid = await post("clip.mp4", "video/mp4", "0123456789");
+    const url = `${base}/api/uploads/file?session=${s.meta.id}&id=${vid.id}`;
+    expect((await fetch(url)).status).toBe(401);
+    const full = await fetch(url, { headers: { Cookie: cookie() } });
+    expect(full.status).toBe(200);
+    expect(full.headers.get("content-type")).toBe("video/mp4");
+    expect(await full.text()).toBe("0123456789");
+    const part = await fetch(url, { headers: { Cookie: cookie(), Range: "bytes=2-4" } });
+    expect(part.status).toBe(206);
+    expect(part.headers.get("content-range")).toBe("bytes 2-4/10");
+    expect(await part.text()).toBe("234");
+    const page = await post("x.html", "text/html", "<script>alert(1)</script>");
+    const html = await fetch(`${base}/api/uploads/file?session=${s.meta.id}&id=${page.id}`, { headers: { Cookie: cookie() } });
+    expect(html.headers.get("content-type")).toBe("application/octet-stream");
+    expect(html.headers.get("content-disposition")).toMatch(/^attachment/);
+    expect((await fetch(`${base}/api/uploads/file?session=${s.meta.id}&id=nope`, { headers: { Cookie: cookie() } })).status).toBe(404);
+  });
   it("estimates and processes a text upload; guards origin, id count and unknown ids", async () => {
     const s = await startFake();
     await waitFor(() => hub.registry.list().length === 1);

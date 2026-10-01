@@ -1,4 +1,5 @@
 /** DOM rendering. Model output only ever reaches the DOM through textContent / text nodes. */
+import { parseSentMessage, uploadUrl, type SentAttachment } from "./attachments.js";
 import { renderMarkdown } from "./markdown.js";
 import { renderSubagentChildren } from "./subagent.js";
 import type { Item, ToolState, Transcript } from "./transcript.js";
@@ -97,7 +98,7 @@ export function renderTool(s: ToolState, open: Set<string>): HTMLElement {
 export function renderItem(item: Item, t: Transcript, open: Set<string>): HTMLElement {
   switch (item.kind) {
     case "user":
-      return el("article", { class: "msg user", "aria-label": "You" }, formatText(item.text));
+      return userMessage(item.text);
     case "notice":
       return el("div", { class: `notice notice-${item.level}`, role: "note" }, item.text);
     case "status":
@@ -165,4 +166,27 @@ export class TranscriptView {
       }
     }
   }
+}
+
+/** The user's text, with attachments shown as the media itself rather than their host paths. */
+function userMessage(raw: string): HTMLElement {
+  const { text, attachments } = parseSentMessage(raw);
+  const msg = el("article", { class: "msg user", "aria-label": "You" });
+  if (attachments.length) msg.append(el("div", { class: "msg-media" }, ...attachments.map(sentMedia)));
+  if (text.trim()) msg.append(formatText(text));
+  return msg;
+}
+
+function sentMedia(a: SentAttachment): HTMLElement {
+  const src = uploadUrl(a);
+  if (a.kind === "image") {
+    const img = el("img", { src, alt: a.name, loading: "lazy" });
+    return el("a", { href: src, target: "_blank", rel: "noopener", class: "media-item" }, img);
+  }
+  if (a.kind === "video" || a.kind === "audio") {
+    const media = el(a.kind, { src: a.kind === "video" ? `${src}#t=0.1` : src, controls: "", preload: "metadata", title: a.name });
+    if (a.kind === "video") media.setAttribute("playsinline", "");
+    return el("div", { class: `media-item media-${a.kind}` }, media);
+  }
+  return el("a", { href: src, class: "media-file", download: a.name }, a.name);
 }

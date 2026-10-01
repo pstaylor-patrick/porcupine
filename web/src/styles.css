@@ -556,3 +556,11 @@ details > :not(summary) { padding: 0 12px 10px; }
 
 /* Session sheet: each section separated by a hairline and room to breathe. */
 #sheet .field + .field, #sheet .field + .sheet-actions { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+
+/* Attachments sent with a user message, shown as the media itself. */
+.msg-media { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px }
+.msg-media:last-child { margin-bottom:0 }
+.msg-media .media-item { display:block; max-width:100%; border-radius:10px; overflow:hidden; background:var(--line) }
+.msg-media img, .msg-media video { display:block; max-width:min(280px, 100%); max-height:320px; object-fit:contain }
+.msg-media .media-audio audio { display:block; max-width:100% }
+.msg-media .media-file { display:inline-block; padding:6px 10px; border-radius:8px; background:var(--line); color:inherit; font-size:.85em; word-break:break-all }

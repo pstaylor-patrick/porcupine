@@ -10,6 +10,7 @@ import {
   renderChips,
   renderConfirm,
   sendWithAttachments,
+  startUpload,
   type Http,
   type Pending,
   type UploadsConfig,
@@ -672,6 +673,13 @@ export class App {
     }
     this.renderAttachments();
     if (!this.uploadsConfig) void this.loadUploadsConfig();
+    // Upload right away so Send only has to wait for the cost step.
+    const sid = this.conn.sessionId;
+    const max = this.uploadsConfig?.maxBytes ?? DEFAULT_MAX_BYTES;
+    if (sid === null) return;
+    for (const p of this.pending) {
+      if (p.file.size <= max) void startUpload(p, sid, this.uploadsHttp, () => this.renderAttachments()).catch(() => undefined);
+    }
   }
 
   removeAttachment(i: number): void {

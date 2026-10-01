@@ -1,3 +1,5 @@
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { UploadConfig } from "./config.js";
 import { MAX_UPLOADS_PER_MESSAGE } from "./config.js";
@@ -72,6 +74,10 @@ export async function handleUploads(req: IncomingMessage, res: ServerResponse, c
   if (path === "/api/uploads/config" && method === "GET") {
     const { confirmUsd, confirmMinutes, whisperBin, whisperModel } = ctx.config;
     json(res, 200, { confirmUsd, confirmMinutes, whisper: whisperBin !== null && whisperModel !== null, maxBytes: ctx.maxBytes });
+    return true;
+  }
+  if (path === "/api/uploads/file" && (method === "GET" || method === "HEAD")) {
+    await serveUpload(req, res, ctx, url.searchParams.get("session") ?? "", url.searchParams.get("id") ?? "");
     return true;
   }
   if (path === "/api/uploads" && method === "POST") {
@@ -154,4 +160,54 @@ export async function handleUploads(req: IncomingMessage, res: ServerResponse, c
   }
   json(res, 404, { error: "not found" });
   return true;
+}
+
+/** Media types the browser may render inline; anything else downloads. The type is the client's claim, so only these pass. */
+const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|bmp|heic|heif)|video\/(mp4|quicktime|webm|x-matroska|x-m4v)|audio\/[a-z0-9.+-]+)$/;
+
+/** Streams an upload's original file with Range support, which iOS needs to play video. */
+async function serveUpload(req: IncomingMessage, res: ServerResponse, ctx: UploadRouteContext, session: string, id: string): Promise<void> {
+  const meta = await loadUpload(ctx.config.root, session, id);
+  if (!meta) {
+    json(res, 404, { error: "unknown upload" });
+    return;
+  }
+  let size: number;
+  try {
+    size = (await stat(meta.path)).size;
+  } catch {
+    json(res, 404, { error: "file gone" });
+    return;
+  }
+  const mime = meta.mime.toLowerCase();
+  const inline = INLINE_MIME.test(mime);
+  res.setHeader("Content-Type", inline ? mime : "application/octet-stream");
+  res.setHeader("Content-Disposition", `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(meta.name)}`);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Cache-Control", "private, max-age=86400");
+  res.setHeader("Accept-Ranges", "bytes");
+  const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
+  let start = 0;
+  let end = size - 1;
+  if (range && (range[1] || range[2])) {
+    if (range[1]) {
+      start = Number(range[1]);
+      if (range[2]) end = Math.min(Number(range[2]), size - 1);
+    } else {
+      start = Math.max(0, size - Number(range[2]));
+    }
+    if (start > end || start >= size) {
+      res.writeHead(416, { "Content-Range": `bytes */${String(size)}` });
+      res.end();
+      return;
+    }
+    res.writeHead(206, { "Content-Range": `bytes ${String(start)}-${String(end)}/${String(size)}`, "Content-Length": String(end - start + 1) });
+  } else {
+    res.writeHead(200, { "Content-Length": String(size) });
+  }
+  if (req.method === "HEAD" || size === 0) {
+    res.end();
+    return;
+  }
+  createReadStream(meta.path, { start, end }).on("error", () => res.destroy()).pipe(res);
 }
