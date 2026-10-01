@@ -45,7 +45,7 @@ export function loadConfig(input: LoadConfigInput): HubConfig {
   } catch (e) {
     throw new ConfigError(`cannot read env file ${envFile}: ${(e as Error).message}`);
   }
-  const { host, port } = parseAddr(env.PORCUPINE_HUB_ADDR ?? "127.0.0.1:8787");
+  const { host, port } = parseAddr(env.PORCUPINE_HUB_ADDR ?? secrets.PORCUPINE_HUB_ADDR ?? "127.0.0.1:8787");
   const dev = env.PORCUPINE_DEV === "1";
   if (dev && !isLoopback(host)) {
     throw new ConfigError(`PORCUPINE_DEV is set but PORCUPINE_HUB_ADDR (${host}) is not loopback; refusing to start`);

@@ -19,6 +19,11 @@ describe("loadConfig", () => {
     expect(c).toMatchObject({ host: "127.0.0.1", port: 8787, dev: false, cookieTtlSec: 2592000 });
     expect(c.origins).toEqual(["https://porcupine.example.com"]);
   });
+  it("takes PORCUPINE_HUB_ADDR from the env file when the process env lacks it", () => {
+    expect(load({}, { ...secrets, PORCUPINE_HUB_ADDR: "172.17.0.1:9000" })).toMatchObject({ host: "172.17.0.1", port: 9000 });
+    expect(load({ PORCUPINE_HUB_ADDR: "127.0.0.1:1" }, { ...secrets, PORCUPINE_HUB_ADDR: "172.17.0.1:9000" }).port).toBe(1);
+  });
+
   it("dev mode adds localhost origins", () => {
     expect(load({ PORCUPINE_DEV: "1" }).origins).toContain("http://localhost:8787");
   });
