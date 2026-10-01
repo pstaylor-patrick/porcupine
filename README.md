@@ -103,6 +103,35 @@ It appears in the app's sidebar. Without `--name` the name is the tmux
 Each pane logs the model it starts on, and the app shows the current model in
 settings. Ctrl-C in the pane ends the session; a reboot clears them all.
 
+## Attachments
+
+The "+" button left of the message box attaches files. Nothing happens to them
+until you press Send: then each file uploads to the hub host, is preprocessed
+there, and the message goes to pi with a list of absolute paths it opens with
+its read tool. Up to 10 files per message, 2 GB each.
+
+| Kind | What the hub produces |
+|---|---|
+| Images (png, jpeg, gif, webp, bmp; HEIC converted to png) | the file itself; pi sends it to vision models and skips it for text-only ones (the chip warns) |
+| PDF | `text.txt` from pdftotext, plus a png for each page with no text |
+| Audio (any `audio/*`, m4a, mp3, wav, ogg, opus, aac, flac, amr, caf) | `transcript.txt` from local whisper.cpp |
+| Video (any `video/*`, mp4, mov, webm, mkv, m4v) | `transcript.txt` of the audio track and one frame every 10 s, at most 60 |
+| Text, JSON, Markdown, CSV | the file itself |
+
+Transcription needs whisper.cpp (`ruby install.rb --whisper`, see Install).
+Without it audio and video chips warn, and processing reports a per-file error
+in the message instead of dropping the file; video still gets its frames.
+
+Before any processing the app estimates the cost at the selected model's input
+price. When the estimate is over $0.50 or any audio or video runs longer than
+10 minutes, a card asks twice (Continue, then Spend) before anything is spent;
+Cancel keeps the message and the files. `PORCUPINE_CONFIRM_USD` and
+`PORCUPINE_CONFIRM_MINUTES` change those thresholds.
+
+Files are kept under `~/.local/share/porcupine/uploads/<session>/` (or
+`$XDG_DATA_HOME/porcupine/uploads`) and deleted after 30 days, checked at hub
+start and daily.
+
 ## Optional: DNS and TLS on AWS
 
 `infra/` is a Terraform example for a public hostname that points at a private

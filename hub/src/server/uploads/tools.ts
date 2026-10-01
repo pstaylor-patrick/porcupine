@@ -31,7 +31,7 @@ export const PDF_TIMEOUT_MS = 120_000;
 
 /** ffmpeg and whisper time limit: duration * 3 + 300 s. */
 export function mediaTimeoutMs(durationSec: number): number {
-  return (Math.max(0, durationSec) * 3 + 300) * 1000;
+  return Math.ceil((Math.max(0, durationSec) * 3 + 300) * 1000);
 }
 
 export class WhisperMissingError extends Error {

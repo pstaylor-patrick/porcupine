@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { UploadConfig } from "../src/server/uploads/config.js";
 import { processUpload } from "../src/server/uploads/process.js";
 import type { UploadMeta } from "../src/server/uploads/store.js";
-import { makeTools, WhisperMissingError, type Exec } from "../src/server/uploads/tools.js";
+import { makeTools, mediaTimeoutMs, WhisperMissingError, type Exec } from "../src/server/uploads/tools.js";
 
 let dir: string;
 beforeEach(() => {
@@ -115,5 +115,12 @@ describe("processUpload", () => {
     expect((await processUpload(dir, meta("image", "p.png"), cfg(true), tools)).notes).toEqual([]);
     rmSync(join(dir, "result.json"));
     expect((await processUpload(dir, meta("file", "z.bin"), cfg(true), tools)).notes).toEqual(["not preprocessed; stored as-is"]);
+  });
+});
+
+describe("mediaTimeoutMs", () => {
+  it("returns an integer for fractional durations (execFile rejects non-integer timeouts)", () => {
+    expect(mediaTimeoutMs(5.0065)).toBe(315_020);
+    expect(Number.isInteger(mediaTimeoutMs(1.23456))).toBe(true);
   });
 });
