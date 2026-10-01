@@ -30,10 +30,27 @@ import {
   type UsageReport,
 } from "./usage.js";
 import { CommandMenu, parseCommands } from "./commands.js";
-import { autocompactCommand, defaultThreshold, groupDigits, contextText, parseContextUsage, type ContextInfo } from "./context.js";
-import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
+import {
+  autocompactCommand,
+  defaultThreshold,
+  groupDigits,
+  contextText,
+  parseContextUsage,
+  type ContextInfo,
+} from "./context.js";
+import {
+  DialogQueue,
+  renderDialog,
+  type Dialog,
+  type DialogAnswer,
+} from "./questions.js";
 import { TranscriptView } from "./render.js";
-import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./transcript.js";
+import {
+  applyEvent,
+  emptyTranscript,
+  fromMessages,
+  type Transcript,
+} from "./transcript.js";
 import {
   CAPABILITIES,
   CHEAP_INPUT_MAX,
@@ -53,9 +70,33 @@ import {
   type RecentStorage,
   type SheetState,
 } from "./models.js";
-import { emptyQueue, itemsFromQueue, parseQueue, planRewrite, renderQueueChips, restoreText, targetAt, type PiQueue, type QueueItem, type QueueTarget } from "./queue.js";
-import { Connection, type PiResponse, type ServerFrame, type SessionInfo } from "./ws.js";
-import { disablePush, enablePush, getNotifyPrefs, pushHint, pushState, setNotifyPref, type NotifyPrefs } from "./push.js";
+import {
+  emptyQueue,
+  itemsFromQueue,
+  parseQueue,
+  planRewrite,
+  renderQueueChips,
+  restoreText,
+  targetAt,
+  type PiQueue,
+  type QueueItem,
+  type QueueTarget,
+} from "./queue.js";
+import {
+  Connection,
+  type PiResponse,
+  type ServerFrame,
+  type SessionInfo,
+} from "./ws.js";
+import {
+  disablePush,
+  enablePush,
+  getNotifyPrefs,
+  pushHint,
+  pushState,
+  setNotifyPref,
+  type NotifyPrefs,
+} from "./push.js";
 
 export function appTitle(): string {
   return "Porcupine";
@@ -77,23 +118,34 @@ export function basename(path: string): string {
 }
 
 declare const __APP_VERSION__: string | undefined;
-export const APP_VERSION: string = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
+export const APP_VERSION: string =
+  typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
 
-const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE =
+  'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
 /**
  * Enter sends, Shift+Enter inserts a newline. Esc never aborts: it pops the last queued message into
  * the composer, or blurs the input when nothing is queued (open overlays take Esc first, see App.bind).
  * Returns true when the key was handled.
  */
-export function handleComposerKey(e: KeyboardEvent, actions: ComposerActions): boolean {
+export function handleComposerKey(
+  e: KeyboardEvent,
+  actions: ComposerActions,
+): boolean {
   if (e.isComposing) return false;
   if (e.key === "Escape") {
     e.preventDefault();
     if (!actions.popQueue() && e.target instanceof HTMLElement) e.target.blur();
     return true;
   }
-  if (e.key === "Enter" && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+  if (
+    e.key === "Enter" &&
+    !e.shiftKey &&
+    !e.altKey &&
+    !e.ctrlKey &&
+    !e.metaKey
+  ) {
     e.preventDefault();
     actions.send();
     return true;
@@ -104,8 +156,16 @@ export function handleComposerKey(e: KeyboardEvent, actions: ComposerActions): b
 export type StreamingBehavior = "followUp" | "steer";
 
 /** The prompt command. `images` is always present (empty until attachments land). */
-export function buildPrompt(message: string, streaming: boolean, behavior: StreamingBehavior): Record<string, unknown> & { type: string } {
-  const cmd: Record<string, unknown> & { type: string } = { type: "prompt", message, images: [] };
+export function buildPrompt(
+  message: string,
+  streaming: boolean,
+  behavior: StreamingBehavior,
+): Record<string, unknown> & { type: string } {
+  const cmd: Record<string, unknown> & { type: string } = {
+    type: "prompt",
+    message,
+    images: [],
+  };
   if (streaming) cmd.streamingBehavior = behavior;
   return cmd;
 }
@@ -141,12 +201,17 @@ export class App {
   sessionUsage: SessionUsage | null = null;
   usage: UsageReport | null = null;
   compacting = false;
+  /** Prompts submitted during compaction, held client-side and flushed when it ends. */
+  held: string[] = [];
+  private flushing = false;
   thinkingLevel = "off";
   connState: "connecting" | "open" | "closed" = "closed";
   /** Open overlays, bottom to top. */
   readonly overlays: Overlay[] = [];
   /** Wide layout: sidebar docked, sheet as a right panel. Overridable for tests. */
-  isDesktop: () => boolean = () => typeof window.matchMedia === "function" && window.matchMedia("(min-width: 900px)").matches;
+  isDesktop: () => boolean = () =>
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(min-width: 900px)").matches;
   navigate: (url: string) => void = (url) => location.assign(url);
   readonly dialogs = new DialogQueue();
   /** pi's queue, mirrored from queue_update (last write wins; the reset snapshot replays it). */
@@ -192,7 +257,12 @@ export class App {
           this.queueBusy = false;
           this.renderQueue();
         }
-        const label = s === "open" ? "Connected" : s === "connecting" ? "Connecting" : "Disconnected";
+        const label =
+          s === "open"
+            ? "Connected"
+            : s === "connecting"
+              ? "Connecting"
+              : "Disconnected";
         $("settings-conn").textContent = label;
         if (s === "open") void this.loadUsage();
       },
@@ -207,7 +277,9 @@ export class App {
     jump.addEventListener("click", () => {
       this.main.scrollTo({ top: this.main.scrollHeight, behavior: "smooth" });
     });
-    this.main.addEventListener("scroll", () => this.syncJump(), { passive: true });
+    this.main.addEventListener("scroll", () => this.syncJump(), {
+      passive: true,
+    });
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       void this.send();
@@ -226,7 +298,10 @@ export class App {
     );
     this.input.addEventListener("keydown", (e) => {
       if (this.commandMenu.handleKey(e)) return;
-      handleComposerKey(e, { send: () => void this.send(), popQueue: () => this.popQueue() });
+      handleComposerKey(e, {
+        send: () => void this.send(),
+        popQueue: () => this.popQueue(),
+      });
     });
     this.input.addEventListener("input", () => {
       this.commandMenu.update();
@@ -250,7 +325,10 @@ export class App {
           {
             label: "Attach other files",
             run: () => {
-              fileInput.accept = allTypes.split(",").filter((t) => t !== "image/*").join(",");
+              fileInput.accept = allTypes
+                .split(",")
+                .filter((t) => t !== "image/*")
+                .join(",");
               fileInput.click();
             },
           },
@@ -263,7 +341,9 @@ export class App {
     });
     $("menu-button").addEventListener("click", () => this.toggleSidebar());
     $("session-title").addEventListener("click", () =>
-      this.overlays.includes("sheet") ? this.close("sheet") : this.openSheet($("session-title")),
+      this.overlays.includes("sheet")
+        ? this.close("sheet")
+        : this.openSheet($("session-title")),
     );
     $("sheet-close").addEventListener("click", () => this.close("sheet"));
     $("scrim").addEventListener("click", () => this.closeTop());
@@ -278,39 +358,61 @@ export class App {
     });
     $("logout").addEventListener("click", () => void this.logout());
     $("reload-app").addEventListener("click", () => void reloadLatest());
-    $("push-toggle").addEventListener("change", (e) => void this.togglePush((e.target as HTMLInputElement).checked));
-    for (const input of $("notify-prefs").querySelectorAll<HTMLInputElement>("input[data-pref]")) {
+    $("push-toggle").addEventListener(
+      "change",
+      (e) => void this.togglePush((e.target as HTMLInputElement).checked),
+    );
+    for (const input of $("notify-prefs").querySelectorAll<HTMLInputElement>(
+      "input[data-pref]",
+    )) {
       input.addEventListener("change", () => {
         const key = input.dataset.pref as keyof NotifyPrefs;
         setNotifyPref(key, input.checked).catch((e: unknown) => {
           input.checked = !input.checked;
-          $("push-status").textContent = `Notifications: ${e instanceof Error ? e.message : String(e)}`;
+          $("push-status").textContent =
+            `Notifications: ${e instanceof Error ? e.message : String(e)}`;
         });
       });
     }
     $("budget-add").addEventListener("click", () => {
       const row = addBudgetRow($("budget-rows"));
       if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
-      else $("budget-status").textContent = "Every provider already has a budget.";
+      else
+        $("budget-status").textContent = "Every provider already has a budget.";
     });
     $("budget-form").addEventListener("submit", (e) => {
       e.preventDefault();
       void this.saveBudgets();
     });
-    $("budget-banner-close").addEventListener("click", () => ($("budget-banner").hidden = true));
-    ($("thinking-select") as HTMLSelectElement).addEventListener("change", (e) => {
-      void this.setThinking((e.target as HTMLSelectElement).value);
-    });
-    ($("model-filter") as HTMLInputElement).addEventListener("input", () => this.renderModels());
+    $("budget-banner-close").addEventListener(
+      "click",
+      () => ($("budget-banner").hidden = true),
+    );
+    ($("thinking-select") as HTMLSelectElement).addEventListener(
+      "change",
+      (e) => {
+        void this.setThinking((e.target as HTMLSelectElement).value);
+      },
+    );
+    ($("model-filter") as HTMLInputElement).addEventListener("input", () =>
+      this.renderModels(),
+    );
     this.buildChips();
-    ($("vendor-jump") as HTMLSelectElement).addEventListener("change", (e) => this.jumpToVendor(e.target as HTMLSelectElement));
+    ($("vendor-jump") as HTMLSelectElement).addEventListener("change", (e) =>
+      this.jumpToVendor(e.target as HTMLSelectElement),
+    );
     $("new-session").addEventListener("click", () => void this.newSession());
     $("abort-retry").addEventListener("click", () => void this.abortRetry());
     $("compact-now").addEventListener("click", () => void this.compactNow());
-    $("autocompact-save").addEventListener("click", () => void this.saveAutocompact());
+    $("autocompact-save").addEventListener(
+      "click",
+      () => void this.saveAutocompact(),
+    );
     const threshold = $("autocompact-input") as HTMLInputElement;
     threshold.addEventListener("input", () => {
-      const fromEnd = threshold.value.length - (threshold.selectionStart ?? threshold.value.length);
+      const fromEnd =
+        threshold.value.length -
+        (threshold.selectionStart ?? threshold.value.length);
       threshold.value = groupDigits(threshold.value);
       const at = Math.max(0, threshold.value.length - fromEnd);
       threshold.setSelectionRange(at, at);
@@ -324,12 +426,28 @@ export class App {
 
   // ---- overlays -------------------------------------------------------
 
-  private open(o: Overlay, focusId: string, explicitOpener?: HTMLElement): void {
+  private open(
+    o: Overlay,
+    focusId: string,
+    explicitOpener?: HTMLElement,
+  ): void {
     if (!this.overlays.includes(o)) {
       const active = document.activeElement;
       // Safari does not focus buttons on tap, so fall back to the control that opens this overlay.
-      const opener = document.getElementById(o === "sheet" ? "session-title" : o === "dialog" ? "input" : "menu-button");
-      this.returnFocus.set(o, explicitOpener ?? (active instanceof HTMLElement && active !== document.body ? active : opener));
+      const opener = document.getElementById(
+        o === "sheet"
+          ? "session-title"
+          : o === "dialog"
+            ? "input"
+            : "menu-button",
+      );
+      this.returnFocus.set(
+        o,
+        explicitOpener ??
+          (active instanceof HTMLElement && active !== document.body
+            ? active
+            : opener),
+      );
       this.overlays.push(o);
     }
     this.syncOverlays();
@@ -364,8 +482,14 @@ export class App {
   }
 
   private firstSessionButtonId(): string {
-    const current = document.querySelector<HTMLElement>('#session-list [aria-current="true"]');
-    return current?.id || document.querySelector<HTMLElement>("#session-list button")?.id || "settings-link";
+    const current = document.querySelector<HTMLElement>(
+      '#session-list [aria-current="true"]',
+    );
+    return (
+      current?.id ||
+      document.querySelector<HTMLElement>("#session-list button")?.id ||
+      "settings-link"
+    );
   }
 
   openSheet(opener?: HTMLElement): void {
@@ -374,7 +498,10 @@ export class App {
     this.renderHeader();
     void this.loadModels();
     void this.refreshContext();
-    this.mergeMode ??= new MergeModePicker($("merge-mode-select") as HTMLSelectElement, $("merge-mode-status"));
+    this.mergeMode ??= new MergeModePicker(
+      $("merge-mode-select") as HTMLSelectElement,
+      $("merge-mode-status"),
+    );
     void this.mergeMode.load(this.conn.sessionId);
   }
 
@@ -401,7 +528,8 @@ export class App {
       sidebar.removeAttribute("role");
       sidebar.removeAttribute("aria-modal");
     }
-    if (!desktop) $("menu-button").setAttribute("aria-expanded", String(sidebarOpen));
+    if (!desktop)
+      $("menu-button").setAttribute("aria-expanded", String(sidebarOpen));
     $("sheet").dataset.open = String(sheetOpen);
     $("session-title").setAttribute("aria-expanded", String(sheetOpen));
     $("settings").hidden = !settingsOpen;
@@ -417,15 +545,23 @@ export class App {
   private trapFocus(e: KeyboardEvent): void {
     const top = this.overlays[this.overlays.length - 1];
     if (!top) return;
-    const nodes = [...this.overlayElement(top).querySelectorAll<HTMLElement>(FOCUSABLE)];
+    const nodes = [
+      ...this.overlayElement(top).querySelectorAll<HTMLElement>(FOCUSABLE),
+    ];
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
     if (!first || !last) return;
     const active = document.activeElement;
-    if (e.shiftKey && (active === first || !this.overlayElement(top).contains(active))) {
+    if (
+      e.shiftKey &&
+      (active === first || !this.overlayElement(top).contains(active))
+    ) {
       e.preventDefault();
       last.focus();
-    } else if (!e.shiftKey && (active === last || !this.overlayElement(top).contains(active))) {
+    } else if (
+      !e.shiftKey &&
+      (active === last || !this.overlayElement(top).contains(active))
+    ) {
       e.preventDefault();
       first.focus();
     }
@@ -459,7 +595,11 @@ export class App {
 
   async answerDialog(a: DialogAnswer): Promise<void> {
     const r = await this.conn.command(a);
-    if (!r.success) this.notice("error", `answer not delivered: ${r.error ?? "unknown error"}`);
+    if (!r.success)
+      this.notice(
+        "error",
+        `answer not delivered: ${r.error ?? "unknown error"}`,
+      );
   }
 
   // ---- settings -------------------------------------------------------
@@ -484,7 +624,10 @@ export class App {
     if (st !== "on") return;
     try {
       const p = await getNotifyPrefs();
-      for (const input of prefs.querySelectorAll<HTMLInputElement>("input[data-pref]")) input.checked = p[input.dataset.pref as keyof NotifyPrefs];
+      for (const input of prefs.querySelectorAll<HTMLInputElement>(
+        "input[data-pref]",
+      ))
+        input.checked = p[input.dataset.pref as keyof NotifyPrefs];
     } catch {
       prefs.hidden = true;
     }
@@ -511,12 +654,20 @@ export class App {
       if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
       r = (await res.json()) as UsageReport;
     } catch (e) {
-      if (form) $("usage-body").replaceChildren(document.createTextNode(`Usage unavailable: ${(e as Error).message}`));
+      if (form)
+        $("usage-body").replaceChildren(
+          document.createTextNode(`Usage unavailable: ${(e as Error).message}`),
+        );
       return;
     }
     this.usage = r;
     renderUsage($("usage-body"), r);
-    if (form) renderBudgetForm($("budget-rows"), r.budgets, r.providers.map((p) => p.provider));
+    if (form)
+      renderBudgetForm(
+        $("budget-rows"),
+        r.budgets,
+        r.providers.map((p) => p.provider),
+      );
     const b = bannerFromReport(r);
     if (b) this.showBanner(b.level, b.text);
   }
@@ -544,7 +695,9 @@ export class App {
         body: JSON.stringify({ budgets }),
       });
       const body = (await res.json()) as { error?: string };
-      status.textContent = res.ok ? "Saved." : `Not saved: ${body.error ?? `HTTP ${String(res.status)}`}`;
+      status.textContent = res.ok
+        ? "Saved."
+        : `Not saved: ${body.error ?? `HTTP ${String(res.status)}`}`;
       if (res.ok) await this.loadUsage(true);
     } catch (e) {
       status.textContent = `Not saved: ${(e as Error).message}`;
@@ -553,7 +706,10 @@ export class App {
 
   async logout(): Promise<void> {
     try {
-      await fetch("/api/logout", { method: "POST", credentials: "same-origin" });
+      await fetch("/api/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
     } catch {
       // offline: the cookie stays, but the login page is still the right place to land
     }
@@ -572,11 +728,23 @@ export class App {
       case "sessions":
         this.sessions = f.sessions;
         this.sessionsLoaded = true;
-        if (this.pendingOpen && f.sessions.some((s) => s.id === this.pendingOpen)) {
+        if (
+          this.pendingOpen &&
+          f.sessions.some((s) => s.id === this.pendingOpen)
+        ) {
           this.attach(this.pendingOpen);
           this.pendingOpen = null;
-        } else if (!this.conn.sessionId && f.sessions.length === 1 && f.sessions[0]) this.attach(f.sessions[0].id);
-        else if (this.conn.sessionId && !f.sessions.some((s) => s.id === this.conn.sessionId)) this.sessionGone();
+        } else if (
+          !this.conn.sessionId &&
+          f.sessions.length === 1 &&
+          f.sessions[0]
+        )
+          this.attach(f.sessions[0].id);
+        else if (
+          this.conn.sessionId &&
+          !f.sessions.some((s) => s.id === this.conn.sessionId)
+        )
+          this.sessionGone();
         this.renderSessions();
         return;
       case "attached":
@@ -596,14 +764,23 @@ export class App {
         else {
           applyEvent(this.t, f.event);
           if (this.dialogs.apply(f.event)) this.syncDialog();
-          if (f.event.type === "agent_end" || f.event.type === "compaction_end") void this.refreshContext();
+          if (f.event.type === "agent_end" || f.event.type === "compaction_end")
+            void this.refreshContext();
           if (f.event.type === "agent_settled") void this.loadCommands();
           this.applyRetry(f.event);
           if (f.event.type === "compaction_start") {
             this.compacting = true;
             this.renderContext();
           }
-          if (f.event.type === "thinking_level_changed" && typeof f.event.level === "string") {
+          if (f.event.type === "compaction_end") {
+            this.compacting = false;
+            this.renderContext();
+            void this.flushHeld();
+          }
+          if (
+            f.event.type === "thinking_level_changed" &&
+            typeof f.event.level === "string"
+          ) {
             this.thinkingLevel = f.event.level;
             this.renderHeader();
           }
@@ -632,6 +809,7 @@ export class App {
       this.statusPanel.clear();
       this.renderStatusPanel();
       this.queue = emptyQueue();
+      this.held = [];
       this.renderQueue();
       this.t = emptyTranscript();
       this.view.clear();
@@ -675,14 +853,21 @@ export class App {
     this.resetting = true;
     this.resetBuffer = [];
     const r = await this.conn.command({ type: "get_messages" });
-    const t = r.success && isRec(r.data) ? fromMessages(r.data.messages) : emptyTranscript();
+    const t =
+      r.success && isRec(r.data)
+        ? fromMessages(r.data.messages)
+        : emptyTranscript();
     const buffered = this.resetBuffer;
     this.resetting = false;
     this.resetBuffer = [];
     for (const ev of buffered) applyEvent(t, ev);
     this.t = t;
     this.view.clear();
-    if (!r.success) this.notice("error", `could not load history: ${r.error ?? "unknown error"}`);
+    if (!r.success)
+      this.notice(
+        "error",
+        `could not load history: ${r.error ?? "unknown error"}`,
+      );
     void this.refreshState();
     this.queueRender();
   }
@@ -692,7 +877,8 @@ export class App {
     if (!r.success || !isRec(r.data)) return;
     const d = r.data;
     if ("model" in d) this.model = parseModel(d.model);
-    if (typeof d.thinkingLevel === "string") this.thinkingLevel = d.thinkingLevel;
+    if (typeof d.thinkingLevel === "string")
+      this.thinkingLevel = d.thinkingLevel;
     if (typeof d.isStreaming === "boolean") this.t.isStreaming = d.isStreaming;
     if (typeof d.isCompacting === "boolean") this.compacting = d.isCompacting;
     this.renderHeader();
@@ -708,7 +894,10 @@ export class App {
   addFiles(files: File[]): void {
     for (const file of files) {
       if (this.pending.length >= MAX_ATTACHMENTS) {
-        this.notice("warn", `at most ${MAX_ATTACHMENTS} attachments per message; ${file.name} not added`);
+        this.notice(
+          "warn",
+          `at most ${MAX_ATTACHMENTS} attachments per message; ${file.name} not added`,
+        );
         continue;
       }
       this.pending.push({ file, kind: classify(file) });
@@ -720,7 +909,10 @@ export class App {
     const max = this.uploadsConfig?.maxBytes ?? DEFAULT_MAX_BYTES;
     if (sid === null) return;
     for (const p of this.pending) {
-      if (p.file.size <= max) void startUpload(p, sid, this.uploadsHttp, () => this.renderAttachments()).catch(() => undefined);
+      if (p.file.size <= max)
+        void startUpload(p, sid, this.uploadsHttp, () =>
+          this.renderAttachments(),
+        ).catch(() => undefined);
     }
   }
 
@@ -741,7 +933,11 @@ export class App {
   }
 
   renderAttachments(): void {
-    if (!this.sending && textOnly(this.model) && this.pending.some((p) => p.kind === "image")) {
+    if (
+      !this.sending &&
+      textOnly(this.model) &&
+      this.pending.some((p) => p.kind === "image")
+    ) {
       const n = this.pending.length;
       this.pending = [];
       showNotice(
@@ -751,10 +947,21 @@ export class App {
     }
     const cfg = this.uploadsConfig;
     for (const p of this.pending) {
-      p.warn = chipWarning(p.kind, p.file.size, cfg?.maxBytes ?? DEFAULT_MAX_BYTES, cfg?.whisper ?? true);
+      p.warn = chipWarning(
+        p.kind,
+        p.file.size,
+        cfg?.maxBytes ?? DEFAULT_MAX_BYTES,
+        cfg?.whisper ?? true,
+      );
     }
-    renderChips($("attachments"), this.pending, (i) => this.removeAttachment(i), this.sending);
-    ($("attach") as HTMLButtonElement).disabled = this.sending || this.conn.sessionId === null;
+    renderChips(
+      $("attachments"),
+      this.pending,
+      (i) => this.removeAttachment(i),
+      this.sending,
+    );
+    ($("attach") as HTMLButtonElement).disabled =
+      this.sending || this.conn.sessionId === null;
     ($("send") as HTMLButtonElement).disabled = this.sending;
     this.queueRender();
   }
@@ -765,7 +972,10 @@ export class App {
     el.hidden = text === "";
   }
 
-  private async sendAttachments(text: string, sid: string): Promise<string | null> {
+  private async sendAttachments(
+    text: string,
+    sid: string,
+  ): Promise<string | null> {
     const cfg = this.uploadsConfig ?? (await this.loadUploadsConfig());
     if (!cfg) return null;
     const tooBig = this.pending.find((p) => p.file.size > cfg.maxBytes);
@@ -809,6 +1019,18 @@ export class App {
       if (full === null || this.conn.sessionId !== sid) return;
       text = full;
     }
+    if (this.compacting) {
+      this.held.push(text);
+      this.input.value = "";
+      this.autogrow();
+      if (withFiles) {
+        this.pending = [];
+        this.renderAttachments();
+      }
+      this.renderQueue();
+      this.queueRender();
+      return;
+    }
     const cmd = buildPrompt(text, this.t.isStreaming, "followUp");
     const typed = this.input.value;
     this.input.value = "";
@@ -833,12 +1055,72 @@ export class App {
       this.renderContext();
       return;
     }
-    const [stats, state] = await Promise.all([this.conn.command({ type: "get_session_stats" }), this.conn.command({ type: "get_state" })]);
+    const [stats, state] = await Promise.all([
+      this.conn.command({ type: "get_session_stats" }),
+      this.conn.command({ type: "get_state" }),
+    ]);
     if (this.conn.sessionId !== sid) return;
     this.context = stats.success ? parseContextUsage(stats.data) : null;
     this.sessionUsage = stats.success ? parseSessionUsage(stats.data) : null;
-    if (state.success && isRec(state.data) && typeof state.data.isCompacting === "boolean") this.compacting = state.data.isCompacting;
+    if (
+      state.success &&
+      isRec(state.data) &&
+      typeof state.data.isCompacting === "boolean"
+    )
+      this.compacting = state.data.isCompacting;
     this.renderContext();
+    if (!this.compacting) void this.flushHeld();
+  }
+
+  /**
+   * Sends held prompts in order once compaction is over: followUp while streaming, else the first as a
+   * plain prompt. A compaction rejection keeps the rest held for the next compaction end; any other
+   * rejection puts the unsent texts back into the composer.
+   */
+  async flushHeld(): Promise<void> {
+    if (
+      this.flushing ||
+      this.compacting ||
+      this.held.length === 0 ||
+      !this.conn.sessionId
+    )
+      return;
+    this.flushing = true;
+    let started = false;
+    try {
+      while (this.held.length > 0 && !this.compacting) {
+        const text = this.held[0] as string;
+        const r = await this.conn.command(
+          buildPrompt(text, started || this.t.isStreaming, "followUp"),
+        );
+        if (!r.success) {
+          if (/compaction/i.test(r.error ?? "")) {
+            this.compacting = true;
+            this.renderContext();
+          } else {
+            this.input.value = restoreText(
+              { steering: [], followUp: this.held },
+              this.input.value,
+            );
+            this.held = [];
+            this.autogrow();
+            this.notice(
+              "error",
+              `prompt rejected: ${r.error ?? "unknown error"}`,
+            );
+          }
+          break;
+        }
+        this.held.shift();
+        // The first plain prompt starts a turn; the rest queue behind it.
+        started = true;
+        this.renderQueue();
+      }
+    } finally {
+      this.flushing = false;
+      this.renderQueue();
+      this.queueRender();
+    }
   }
 
   renderContext(): void {
@@ -848,7 +1130,9 @@ export class App {
     meter.setAttribute("aria-valuenow", String(Math.round(pctUsed)));
     meter.dataset.level = pctUsed >= 80 ? "high" : "ok";
     (meter.firstElementChild as HTMLElement).style.width = `${pctUsed}%`;
-    $("context-text").textContent = this.compacting ? `${contextText(c)} (compacting)` : contextText(c);
+    $("context-text").textContent = this.compacting
+      ? `${contextText(c)} (compacting)`
+      : contextText(c);
     const attached = this.conn.sessionId !== null;
     const u = this.sessionUsage;
     $("session-usage").textContent = sessionUsageText(u);
@@ -856,9 +1140,12 @@ export class App {
     cost.textContent = u ? formatUsd(u.cost) : "";
     cost.title = u ? `Session cost: ${sessionUsageText(u)}` : "";
     cost.hidden = !u || !attached || u.cost === 0;
-    ($("compact-now") as HTMLButtonElement).disabled = !attached || this.compacting;
+    ($("compact-now") as HTMLButtonElement).disabled =
+      !attached || this.compacting;
     ($("autocompact-save") as HTMLButtonElement).disabled = !attached;
-    ($("autocompact-input") as HTMLInputElement).placeholder = groupDigits(String(defaultThreshold(this.model?.contextWindow)));
+    ($("autocompact-input") as HTMLInputElement).placeholder = groupDigits(
+      String(defaultThreshold(this.model?.contextWindow)),
+    );
   }
 
   // ---- slash commands, retry -------------------------------
@@ -874,9 +1161,15 @@ export class App {
   applyRetry(ev: Record<string, unknown>): void {
     const banner = $("retry-banner");
     if (ev.type === "auto_retry_start") {
-      $("retry-banner-text").textContent = `Retrying (${String(ev.attempt)}/${String(ev.maxAttempts)})`;
+      $("retry-banner-text").textContent =
+        `Retrying (${String(ev.attempt)}/${String(ev.maxAttempts)})`;
       banner.hidden = false;
-    } else if (ev.type === "auto_retry_end" || ev.type === "agent_end" || ev.type === "agent_settled") banner.hidden = true;
+    } else if (
+      ev.type === "auto_retry_end" ||
+      ev.type === "agent_end" ||
+      ev.type === "agent_settled"
+    )
+      banner.hidden = true;
   }
 
   async abortRetry(): Promise<void> {
@@ -898,13 +1191,22 @@ export class App {
 
   async saveAutocompact(): Promise<void> {
     if (!this.conn.sessionId) return;
-    const msg = autocompactCommand(($("autocompact-input") as HTMLInputElement).value, !($("autocompact-on") as HTMLInputElement).checked);
+    const msg = autocompactCommand(
+      ($("autocompact-input") as HTMLInputElement).value,
+      !($("autocompact-on") as HTMLInputElement).checked,
+    );
     if (msg === null) {
-      this.notice("error", "auto-compact: enter a positive whole number of tokens");
+      this.notice(
+        "error",
+        "auto-compact: enter a positive whole number of tokens",
+      );
       return;
     }
-    const r = await this.conn.command(buildPrompt(msg, this.t.isStreaming, "followUp"));
-    if (!r.success) this.notice("error", `auto-compact: ${r.error ?? "failed"}`);
+    const r = await this.conn.command(
+      buildPrompt(msg, this.t.isStreaming, "followUp"),
+    );
+    if (!r.success)
+      this.notice("error", `auto-compact: ${r.error ?? "failed"}`);
   }
 
   async abort(): Promise<void> {
@@ -912,9 +1214,19 @@ export class App {
     // pi's abort leaves the queue intact; clear it first so stale items do not ride along with the next prompt.
     const cleared = await this.conn.command({ type: "clear_queue" });
     const r = await this.conn.command({ type: "abort" });
-    if (!r.success) this.notice("error", `abort failed: ${r.error ?? "unknown error"}`);
-    if (cleared.success) {
-      this.input.value = restoreText(parseQueue((cleared.data ?? {}) as Record<string, unknown>), this.input.value);
+    if (!r.success)
+      this.notice("error", `abort failed: ${r.error ?? "unknown error"}`);
+    const held = this.held;
+    this.held = [];
+    this.renderQueue();
+    if (cleared.success || held.length) {
+      const q = cleared.success
+        ? parseQueue((cleared.data ?? {}) as Record<string, unknown>)
+        : emptyQueue();
+      this.input.value = restoreText(
+        { steering: q.steering, followUp: [...q.followUp, ...held] },
+        this.input.value,
+      );
       this.autogrow();
       this.queueRender();
       this.input.focus();
@@ -929,10 +1241,19 @@ export class App {
   }
 
   async setModel(m: ModelInfo): Promise<void> {
-    const r = await this.conn.command({ type: "set_model", provider: m.provider, modelId: m.id });
+    const r = await this.conn.command({
+      type: "set_model",
+      provider: m.provider,
+      modelId: m.id,
+    });
     if (r.success) {
       this.model = parseModel(r.data) ?? m;
-      pushRecent(recentStorage(), recentKey(this.model), this.models, this.model.provider);
+      pushRecent(
+        recentStorage(),
+        recentKey(this.model),
+        this.models,
+        this.model.provider,
+      );
     } else this.notice("error", `set model: ${r.error ?? "failed"}`);
     this.renderHeader();
     this.renderAttachments();
@@ -941,7 +1262,12 @@ export class App {
 
   async newSession(): Promise<void> {
     if (!this.conn.sessionId) return;
-    if (!window.confirm("Start a new conversation in this pi process? The current one stays in its session file.")) return;
+    if (
+      !window.confirm(
+        "Start a new conversation in this pi process? The current one stays in its session file.",
+      )
+    )
+      return;
     const r: PiResponse = await this.conn.command({ type: "new_session" });
     if (!r.success) {
       this.notice("error", `new session: ${r.error ?? "failed"}`);
@@ -983,7 +1309,9 @@ export class App {
       const r = await this.conn.command({ type: "get_available_models" });
       if (seq !== this.modelsSeq || this.conn.sessionId !== sid) return;
       if (r.success && isRec(r.data) && Array.isArray(r.data.models)) {
-        this.models = r.data.models.map(parseModel).filter((m): m is ModelInfo => m !== null);
+        this.models = r.data.models
+          .map(parseModel)
+          .filter((m): m is ModelInfo => m !== null);
       } else {
         this.modelsError = r.error ?? "failed";
         this.notice("error", `models: ${this.modelsError}`);
@@ -1010,19 +1338,37 @@ export class App {
     });
     const q = ($("model-filter") as HTMLInputElement).value.trim();
     const filtering = q !== "" || this.caps.size > 0;
-    const shown = state === "ready" ? filterModels(this.models, q, this.caps) : [];
+    const shown =
+      state === "ready" ? filterModels(this.models, q, this.caps) : [];
     const noMatches = state === "ready" && shown.length === 0;
     status.hidden = state === "ready" && !noMatches;
     status.dataset.state = noMatches ? "no-matches" : state;
-    if (state === "error") status.textContent = `Could not load models: ${this.modelsError ?? "failed"}`;
+    if (state === "error")
+      status.textContent = `Could not load models: ${this.modelsError ?? "failed"}`;
     else if (state !== "ready") status.textContent = SHEET_MESSAGES[state];
-    else status.textContent = noMatches ? (this.caps.size > 0 ? "No models match these filters" : "No matches") : "";
+    else
+      status.textContent = noMatches
+        ? this.caps.size > 0
+          ? "No models match these filters"
+          : "No matches"
+        : "";
 
-    const recentModels = filtering || state !== "ready" ? [] : resolveRecent(loadRecent(recentStorage()), this.models, this.model?.provider);
+    const recentModels =
+      filtering || state !== "ready"
+        ? []
+        : resolveRecent(
+            loadRecent(recentStorage()),
+            this.models,
+            this.model?.provider,
+          );
     recent.hidden = recentModels.length === 0;
-    $("model-recent-list").replaceChildren(...recentModels.map((m) => this.modelOption(m)));
+    $("model-recent-list").replaceChildren(
+      ...recentModels.map((m) => this.modelOption(m)),
+    );
 
-    const currentVendor = this.model ? vendorOf(this.model.id, this.model.provider) : null;
+    const currentVendor = this.model
+      ? vendorOf(this.model.id, this.model.provider)
+      : null;
     const grouped = groupByVendor(shown);
     groups.replaceChildren(
       ...grouped.map((g) => {
@@ -1067,8 +1413,14 @@ export class App {
     const titles: Record<Capability, { label: string; title: string }> = {
       thinking: { label: "Thinking", title: "Supports extended thinking" },
       images: { label: "Images", title: "Accepts image input" },
-      long: { label: `${LONG_CONTEXT_MIN / 1000}K+`, title: `Context window of ${LONG_CONTEXT_MIN.toLocaleString("en-US")} tokens or more` },
-      cheap: { label: "Cheap", title: `Input $${CHEAP_INPUT_MAX.toFixed(2)} per million tokens or less` },
+      long: {
+        label: `${LONG_CONTEXT_MIN / 1000}K+`,
+        title: `Context window of ${LONG_CONTEXT_MIN.toLocaleString("en-US")} tokens or more`,
+      },
+      cheap: {
+        label: "Cheap",
+        title: `Input $${CHEAP_INPUT_MAX.toFixed(2)} per million tokens or less`,
+      },
     };
     $("model-chips").replaceChildren(
       ...CAPABILITIES.map(({ key }) => {
@@ -1094,7 +1446,11 @@ export class App {
     const vendor = select.value;
     select.value = "";
     if (!vendor) return;
-    const details = [...$("model-groups").querySelectorAll<HTMLDetailsElement>("details.model-group")].find((d) => d.dataset.vendor === vendor);
+    const details = [
+      ...$("model-groups").querySelectorAll<HTMLDetailsElement>(
+        "details.model-group",
+      ),
+    ].find((d) => d.dataset.vendor === vendor);
     if (!details) return;
     details.open = true;
     const browser = details.closest<HTMLElement>(".model-browser");
@@ -1108,7 +1464,10 @@ export class App {
     b.type = "button";
     b.className = "model-option";
     b.setAttribute("role", "option");
-    const current = this.model !== null && this.model.id === m.id && this.model.provider === m.provider;
+    const current =
+      this.model !== null &&
+      this.model.id === m.id &&
+      this.model.provider === m.provider;
     b.setAttribute("aria-selected", current ? "true" : "false");
     const name = document.createElement("span");
     name.className = "model-option-name";
@@ -1152,11 +1511,14 @@ export class App {
   }
 
   queueItems(): QueueItem[] {
-    return itemsFromQueue(this.queue, []);
+    return itemsFromQueue(this.queue, this.held);
   }
 
   renderQueue(): void {
-    const disabled = this.queueBusy || this.conn.sessionId === null || this.connState === "closed";
+    const disabled =
+      this.queueBusy ||
+      this.conn.sessionId === null ||
+      this.connState === "closed";
     renderQueueChips(
       $("queue-chips"),
       this.queueItems(),
@@ -1173,20 +1535,34 @@ export class App {
   popQueue(): boolean {
     const items = this.queueItems();
     if (items.length === 0) return false;
-    if (!this.queueBusy) void this.queueAction(items.length - 1, "edit");
+    if (!this.queueBusy || items[items.length - 1]?.pending)
+      void this.queueAction(items.length - 1, "edit");
     return true;
   }
 
-  async queueAction(i: number, op: "edit" | "cancel" | "sendNow"): Promise<void> {
+  async queueAction(
+    i: number,
+    op: "edit" | "cancel" | "sendNow",
+  ): Promise<void> {
+    const items = this.queueItems();
+    if (items[i]?.pending) {
+      const h = i - (items.length - this.held.length);
+      const [text] = this.held.splice(h, 1);
+      this.renderQueue();
+      if (text !== undefined && op === "edit") this.prependDraft(text);
+      return;
+    }
     if (this.queueBusy || !this.conn.sessionId) return;
-    const target = targetAt(this.queueItems(), i);
+    const target = targetAt(items, i);
     if (!target) return;
     const removed = await this.rewriteQueue(target, op === "sendNow");
     if (removed !== null && op === "edit") this.prependDraft(removed);
   }
 
   private prependDraft(text: string): void {
-    this.input.value = [text, this.input.value].filter((s) => s.trim() !== "").join("\n\n");
+    this.input.value = [text, this.input.value]
+      .filter((s) => s.trim() !== "")
+      .join("\n\n");
     this.autogrow();
     this.queueRender();
     this.input.focus();
@@ -1198,7 +1574,10 @@ export class App {
    * so items another device added survive. Chips re-render from pi's queue_update events.
    * Returns the removed text, or null when nothing was removed.
    */
-  async rewriteQueue(target: QueueTarget, promote = false): Promise<string | null> {
+  async rewriteQueue(
+    target: QueueTarget,
+    promote = false,
+  ): Promise<string | null> {
     this.queueBusy = true;
     this.renderQueue();
     try {
@@ -1207,14 +1586,28 @@ export class App {
         this.notice("error", `queue: ${cleared.error ?? "clear failed"}`);
         return null;
       }
-      const plan = planRewrite(parseQueue(isRec(cleared.data) ? cleared.data : {}), target, promote);
-      if (plan.removed === null) this.notice("warn", "Queue changed, try again");
+      const plan = planRewrite(
+        parseQueue(isRec(cleared.data) ? cleared.data : {}),
+        target,
+        promote,
+      );
+      if (plan.removed === null)
+        this.notice("warn", "Queue changed, try again");
       for (let k = 0; k < plan.next.length; k++) {
         const item = plan.next[k] as QueueItem;
-        const r = await this.conn.command(item.kind === "steer" ? { type: "steer", message: item.text } : { type: "follow_up", message: item.text });
+        const r = await this.conn.command(
+          item.kind === "steer"
+            ? { type: "steer", message: item.text }
+            : { type: "follow_up", message: item.text },
+        );
         if (!r.success) {
           const rest = plan.next.slice(k);
-          const lost = { steering: rest.filter((x) => x.kind === "steer").map((x) => x.text), followUp: rest.filter((x) => x.kind === "followUp").map((x) => x.text) };
+          const lost = {
+            steering: rest.filter((x) => x.kind === "steer").map((x) => x.text),
+            followUp: rest
+              .filter((x) => x.kind === "followUp")
+              .map((x) => x.text),
+          };
           this.input.value = restoreText(lost, this.input.value);
           this.autogrow();
           this.notice("error", `queue: ${r.error ?? "requeue failed"}`);
@@ -1245,7 +1638,10 @@ export class App {
     const name = s ? (this.statusPanel.title ?? s.name) : "Porcupine";
     title.textContent = name;
     title.title = s ? name : "";
-    title.setAttribute("aria-label", s ? `Session settings for ${s.name}` : "Session settings");
+    title.setAttribute(
+      "aria-label",
+      s ? `Session settings for ${s.name}` : "Session settings",
+    );
     $("session-card-name").textContent = s ? s.name : "No session";
     const cwd = $("session-card-cwd");
     cwd.textContent = s ? s.cwd : "";
@@ -1264,7 +1660,8 @@ export class App {
         b.type = "button";
         b.className = "session-item";
         b.id = `session-${s.id}`;
-        if (s.id === this.conn.sessionId) b.setAttribute("aria-current", "true");
+        if (s.id === this.conn.sessionId)
+          b.setAttribute("aria-current", "true");
         const name = document.createElement("span");
         name.className = "session-name";
         name.textContent = s.name;
@@ -1299,7 +1696,8 @@ export class App {
         return li;
       }),
     );
-    $("session-empty").hidden = !this.sessionsLoaded || this.sessions.length > 0;
+    $("session-empty").hidden =
+      !this.sessionsLoaded || this.sessions.length > 0;
     this.syncEmpty();
     this.renderHeader();
     if (!$("settings").hidden) this.renderSettings();
@@ -1308,7 +1706,10 @@ export class App {
   private queueRender(): void {
     if (this.renderQueued) return;
     this.renderQueued = true;
-    const raf = typeof requestAnimationFrame === "function" ? requestAnimationFrame : (fn: () => void) => setTimeout(fn, 16);
+    const raf =
+      typeof requestAnimationFrame === "function"
+        ? requestAnimationFrame
+        : (fn: () => void) => setTimeout(fn, 16);
     raf(() => {
       this.renderQueued = false;
       this.render();
@@ -1321,16 +1722,20 @@ export class App {
 
   /** Shows the jump button whenever the thread is scrolled up from the bottom. */
   syncJump(): void {
-    const gap = this.main.scrollHeight - this.main.scrollTop - this.main.clientHeight;
+    const gap =
+      this.main.scrollHeight - this.main.scrollTop - this.main.clientHeight;
     $("jump-bottom").hidden = gap < 80;
   }
 
   render(): void {
-    const nearBottom = this.main.scrollHeight - this.main.scrollTop - this.main.clientHeight < 120;
+    const nearBottom =
+      this.main.scrollHeight - this.main.scrollTop - this.main.clientHeight <
+      120;
     this.view.render(this.t);
     const streaming = this.t.isStreaming;
     // While streaming, Stop shows only for an empty composer; anything typed or staged turns it into Send.
-    const showStop = streaming && !this.input.value.trim() && this.pending.length === 0;
+    const showStop =
+      streaming && !this.input.value.trim() && this.pending.length === 0;
     $("abort").hidden = !showStop;
     $("send").hidden = showStop;
     $("run-status").textContent = streaming ? "Running" : "Idle";
@@ -1354,19 +1759,27 @@ function pinToVisualViewport(): void {
   // under the composer when pinned all the time.
   const sync = (): void => {
     const el = document.activeElement;
-    const typing = el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && el.type !== "checkbox" && el.type !== "radio");
+    const typing =
+      el instanceof HTMLTextAreaElement ||
+      (el instanceof HTMLInputElement &&
+        el.type !== "checkbox" &&
+        el.type !== "radio");
     const root = document.documentElement.style;
     if (typing) {
       root.setProperty("--app-height", `${vv.height}px`);
       // Bottom sheets are fixed to the layout viewport, which the keyboard covers; lift them above it.
-      root.setProperty("--kb-inset", `${Math.max(0, window.innerHeight - vv.height - vv.offsetTop)}px`);
+      root.setProperty(
+        "--kb-inset",
+        `${Math.max(0, window.innerHeight - vv.height - vv.offsetTop)}px`,
+      );
     } else {
       root.removeProperty("--app-height");
       root.removeProperty("--kb-inset");
     }
     if (window.scrollY !== 0) window.scrollTo(0, 0);
     // Settings scroll internally; keep the focused field above the keyboard.
-    if (typing && el.closest(".settings, .sheet")) el.scrollIntoView({ block: "center" });
+    if (typing && el.closest(".settings, .sheet"))
+      el.scrollIntoView({ block: "center" });
   };
   vv.addEventListener("resize", sync);
   vv.addEventListener("scroll", sync);
@@ -1427,13 +1840,17 @@ export function start(): void {
     if (visible) conn.kick();
   });
   if (document.visibilityState === "hidden") conn.setVisible(false);
-  navigator.serviceWorker?.addEventListener("message", (e: MessageEvent<unknown>) => {
-    const d = e.data as { type?: unknown; session?: unknown } | null;
-    if (d?.type === "open-session" && typeof d.session === "string") {
-      if (app.sessions.some((s) => s.id === d.session)) app.selectSession(d.session);
-      else app.pendingOpen = d.session;
-    }
-  });
+  navigator.serviceWorker?.addEventListener(
+    "message",
+    (e: MessageEvent<unknown>) => {
+      const d = e.data as { type?: unknown; session?: unknown } | null;
+      if (d?.type === "open-session" && typeof d.session === "string") {
+        if (app.sessions.some((s) => s.id === d.session))
+          app.selectSession(d.session);
+        else app.pendingOpen = d.session;
+      }
+    },
+  );
   window.addEventListener("online", () => conn.kick());
   conn.connect();
   if ("serviceWorker" in navigator) {
@@ -1456,9 +1873,16 @@ function recentStorage(): RecentStorage | null {
  * old shell, a deploy mid-flight) reloads itself, at most once a minute.
  */
 function stylesMissing(): boolean {
-  if (getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() !== "") return false;
+  if (
+    getComputedStyle(document.documentElement)
+      .getPropertyValue("--bg")
+      .trim() !== ""
+  )
+    return false;
   try {
-    const last = Number(sessionStorage.getItem("porcupine-style-reload") ?? "0");
+    const last = Number(
+      sessionStorage.getItem("porcupine-style-reload") ?? "0",
+    );
     if (Date.now() - last < 60_000) return false;
     sessionStorage.setItem("porcupine-style-reload", String(Date.now()));
   } catch {

@@ -1,6 +1,12 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import { App, appTitle, buildPrompt, filterModels, handleComposerKey } from "../src/app.js";
+import {
+  App,
+  appTitle,
+  buildPrompt,
+  filterModels,
+  handleComposerKey,
+} from "../src/app.js";
 import { Connection, type PiResponse } from "../src/ws.js";
 import { loadShell } from "./dom.js";
 
@@ -27,7 +33,12 @@ describe("keyboard", () => {
     const input = document.createElement("textarea");
     document.body.append(input);
     input.focus();
-    expect(handleComposerKey(Object.defineProperty(key("Escape"), "target", { value: input }), { send, popQueue: () => false })).toBe(true);
+    expect(
+      handleComposerKey(
+        Object.defineProperty(key("Escape"), "target", { value: input }),
+        { send, popQueue: () => false },
+      ),
+    ).toBe(true);
     expect(document.activeElement).not.toBe(input);
     input.remove();
     expect(handleComposerKey(key("a"), { send, popQueue })).toBe(false);
@@ -36,8 +47,17 @@ describe("keyboard", () => {
 
 describe("prompt", () => {
   it("always carries an empty images array and sets streamingBehavior only while streaming", () => {
-    expect(buildPrompt("hi", false, "followUp")).toEqual({ type: "prompt", message: "hi", images: [] });
-    expect(buildPrompt("hi", true, "followUp")).toEqual({ type: "prompt", message: "hi", images: [], streamingBehavior: "followUp" });
+    expect(buildPrompt("hi", false, "followUp")).toEqual({
+      type: "prompt",
+      message: "hi",
+      images: [],
+    });
+    expect(buildPrompt("hi", true, "followUp")).toEqual({
+      type: "prompt",
+      message: "hi",
+      images: [],
+      streamingBehavior: "followUp",
+    });
     expect(buildPrompt("hi", true, "steer").streamingBehavior).toBe("steer");
   });
 });
@@ -49,7 +69,9 @@ describe("models", () => {
       { provider: "openrouter", id: "openai/gpt-5" },
       { provider: "anthropic", id: "claude-opus-5", name: "Claude Opus" },
     ];
-    expect(filterModels(models, "sonnet").map((m) => m.id)).toEqual(["anthropic/claude-sonnet-5.5"]);
+    expect(filterModels(models, "sonnet").map((m) => m.id)).toEqual([
+      "anthropic/claude-sonnet-5.5",
+    ]);
     expect(filterModels(models, "openrouter claude")).toHaveLength(1);
     expect(filterModels(models, "")).toHaveLength(3);
   });
@@ -58,7 +80,10 @@ describe("models", () => {
 describe("app", () => {
   function setup(responses: Record<string, PiResponse>) {
     loadShell();
-    const conn = new Connection({ url: "ws://x/ws", storage: null }, { onFrame: () => undefined, onStatus: () => undefined });
+    const conn = new Connection(
+      { url: "ws://x/ws", storage: null },
+      { onFrame: () => undefined, onStatus: () => undefined },
+    );
     const sent: Record<string, unknown>[] = [];
     vi.spyOn(conn, "command").mockImplementation((cmd) => {
       sent.push(cmd);
@@ -73,8 +98,14 @@ describe("app", () => {
   it("shows the jump button only when scrolled up from the bottom", () => {
     const { app } = setup({});
     const main = document.getElementById("main") as HTMLElement;
-    Object.defineProperty(main, "scrollHeight", { value: 2000, configurable: true });
-    Object.defineProperty(main, "clientHeight", { value: 500, configurable: true });
+    Object.defineProperty(main, "scrollHeight", {
+      value: 2000,
+      configurable: true,
+    });
+    Object.defineProperty(main, "clientHeight", {
+      value: 500,
+      configurable: true,
+    });
     main.scrollTop = 1500;
     app.syncJump();
     expect(document.getElementById("jump-bottom")?.hidden).toBe(true);
@@ -89,21 +120,51 @@ describe("app", () => {
 
   it("reset rebuilds the transcript from get_messages and reads get_state", async () => {
     const { app, conn, sent } = setup({
-      get_messages: { success: true, data: { messages: [{ role: "user", content: "earlier", timestamp: 1 }] } },
-      get_state: { success: true, data: { model: { id: "m1", provider: "p" }, thinkingLevel: "high", isStreaming: false } },
+      get_messages: {
+        success: true,
+        data: {
+          messages: [{ role: "user", content: "earlier", timestamp: 1 }],
+        },
+      },
+      get_state: {
+        success: true,
+        data: {
+          model: { id: "m1", provider: "p" },
+          thinkingLevel: "high",
+          isStreaming: false,
+        },
+      },
     });
     conn.sessionId = "s1";
     app.onFrame({ t: "reset", session: "s1" });
-    app.onFrame({ t: "event", session: "s1", seq: 1, event: { type: "message_start", message: { role: "user", content: "earlier", timestamp: 1 } } });
-    await vi.waitFor(() => expect(sent.map((c) => c.type)).toContain("get_state"));
+    app.onFrame({
+      t: "event",
+      session: "s1",
+      seq: 1,
+      event: {
+        type: "message_start",
+        message: { role: "user", content: "earlier", timestamp: 1 },
+      },
+    });
+    await vi.waitFor(() =>
+      expect(sent.map((c) => c.type)).toContain("get_state"),
+    );
     await Promise.resolve();
     app.render();
     expect(sent[0]).toEqual({ type: "get_messages" });
     expect(document.querySelectorAll(".msg.user")).toHaveLength(1);
-    expect(document.getElementById("transcript")?.textContent).toContain("earlier");
-    expect(document.querySelector("#model-card .model-card-name")?.textContent).toBe("m1");
-    expect(document.querySelector("#model-card .model-card-vendor")?.textContent).toBe("p");
-    expect((document.getElementById("thinking-select") as HTMLSelectElement).value).toBe("high");
+    expect(document.getElementById("transcript")?.textContent).toContain(
+      "earlier",
+    );
+    expect(
+      document.querySelector("#model-card .model-card-name")?.textContent,
+    ).toBe("m1");
+    expect(
+      document.querySelector("#model-card .model-card-vendor")?.textContent,
+    ).toBe("p");
+    expect(
+      (document.getElementById("thinking-select") as HTMLSelectElement).value,
+    ).toBe("high");
   });
 
   it("uses the documented set_model and set_thinking_level field names", async () => {
@@ -111,22 +172,34 @@ describe("app", () => {
     await app.setModel({ provider: "anthropic", id: "claude-sonnet-5-5" });
     await app.setThinking("low");
     expect(sent).toEqual([
-      { type: "set_model", provider: "anthropic", modelId: "claude-sonnet-5-5" },
+      {
+        type: "set_model",
+        provider: "anthropic",
+        modelId: "claude-sonnet-5-5",
+      },
       { type: "set_thinking_level", level: "low" },
     ]);
   });
 
   it("sends a prompt on Enter with images and restores text on rejection", async () => {
-    const { app, conn, sent } = setup({ prompt: { success: false, error: "agent is streaming" } });
+    const { app, conn, sent } = setup({
+      prompt: { success: false, error: "agent is streaming" },
+    });
     conn.sessionId = "s1";
     const input = document.getElementById("input") as HTMLTextAreaElement;
     input.value = "hello";
-    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
-    await vi.waitFor(() => expect(sent.map((c) => c.type)).toContain("get_state"));
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", cancelable: true }),
+    );
+    await vi.waitFor(() =>
+      expect(sent.map((c) => c.type)).toContain("get_state"),
+    );
     expect(sent[0]).toEqual({ type: "prompt", message: "hello", images: [] });
     expect(input.value).toBe("hello");
     app.render();
-    expect(document.querySelector(".notice-error")?.textContent).toContain("agent is streaming");
+    expect(document.querySelector(".notice-error")?.textContent).toContain(
+      "agent is streaming",
+    );
   });
 
   it("Esc in the composer never aborts and blurs when nothing is queued", async () => {
@@ -135,18 +208,40 @@ describe("app", () => {
     app.t.isStreaming = true;
     const input = document.getElementById("input") as HTMLTextAreaElement;
     input.focus();
-    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", cancelable: true }),
+    );
     await Promise.resolve();
     expect(sent).toEqual([]);
     expect(document.activeElement).not.toBe(input);
   });
 
   const sessions = [
-    { id: "s1", name: "alpha", cwd: "/home/me/code/alpha", model: null, isStreaming: false, startedAt: "1", piVersion: "0.74.0" },
-    { id: "s2", name: "beta", cwd: "/srv/beta/", model: null, isStreaming: true, startedAt: "2" },
+    {
+      id: "s1",
+      name: "alpha",
+      cwd: "/home/me/code/alpha",
+      model: null,
+      isStreaming: false,
+      startedAt: "1",
+      piVersion: "0.74.0",
+    },
+    {
+      id: "s2",
+      name: "beta",
+      cwd: "/srv/beta/",
+      model: null,
+      isStreaming: true,
+      startedAt: "2",
+    },
   ];
   const byId = (id: string) => document.getElementById(id) as HTMLElement;
-  const esc = () => new KeyboardEvent("keydown", { key: "Escape", cancelable: true, bubbles: true });
+  const esc = () =>
+    new KeyboardEvent("keydown", {
+      key: "Escape",
+      cancelable: true,
+      bubbles: true,
+    });
 
   it("opens the sidebar flyout, lists sessions, and attaches on tap", () => {
     const { app, conn } = setup({});
@@ -155,9 +250,15 @@ describe("app", () => {
     });
     app.onFrame({ t: "sessions", sessions });
     expect(byId("session-empty").hidden).toBe(true);
-    const items = [...document.querySelectorAll<HTMLButtonElement>(".session-item")];
-    expect(items.map((b) => b.querySelector(".session-cwd")?.textContent)).toEqual(["alpha", "beta"]);
-    expect(items[1]?.querySelector(".session-streaming")?.getAttribute("aria-label")).toBe("running");
+    const items = [
+      ...document.querySelectorAll<HTMLButtonElement>(".session-item"),
+    ];
+    expect(
+      items.map((b) => b.querySelector(".session-cwd")?.textContent),
+    ).toEqual(["alpha", "beta"]);
+    expect(
+      items[1]?.querySelector(".session-streaming")?.getAttribute("aria-label"),
+    ).toBe("running");
 
     byId("menu-button").click();
     expect(byId("menu-button").getAttribute("aria-expanded")).toBe("true");
@@ -203,13 +304,18 @@ describe("app", () => {
     byId("settings-back").click();
     expect(byId("settings").hidden).toBe(true);
 
-    const fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 200 })));
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 200 })),
+    );
     vi.stubGlobal("fetch", fetchMock);
     const navigate = vi.fn();
     app.navigate = navigate;
     byId("logout").click();
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith("/login"));
-    expect(fetchMock).toHaveBeenCalledWith("/api/logout", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/logout",
+      expect.objectContaining({ method: "POST" }),
+    );
     vi.unstubAllGlobals();
   });
 
@@ -251,7 +357,9 @@ describe("app", () => {
     expect(byId("session-card-name").textContent).toBe("alpha");
     expect(byId("session-card-cwd").textContent).toBe("/home/me/code/alpha");
     expect(byId("session-card-cwd").hidden).toBe(false);
-    expect(byId("session-title").getAttribute("aria-label")).toBe("Session settings for alpha");
+    expect(byId("session-title").getAttribute("aria-label")).toBe(
+      "Session settings for alpha",
+    );
   });
 
   it("opens the sheet from the title and returns focus to it", () => {
@@ -298,34 +406,64 @@ describe("app", () => {
     const { app, conn, sent } = setup({
       get_available_models: {
         success: true,
-        data: { models: [{ provider: "openrouter", id: "anthropic/claude-sonnet-5.5" }, { provider: "openrouter", id: "openai/gpt-5" }] },
+        data: {
+          models: [
+            { provider: "openrouter", id: "anthropic/claude-sonnet-5.5" },
+            { provider: "openrouter", id: "openai/gpt-5" },
+          ],
+        },
       },
     });
     conn.sessionId = "s1";
     app.openSheet();
-    await vi.waitFor(() => expect(document.querySelectorAll("#model-groups .model-option")).toHaveLength(2));
+    await vi.waitFor(() =>
+      expect(
+        document.querySelectorAll("#model-groups .model-option"),
+      ).toHaveLength(2),
+    );
     const filter = byId("model-filter") as HTMLInputElement;
     filter.value = "gpt";
     filter.dispatchEvent(new Event("input"));
-    const options = document.querySelectorAll<HTMLButtonElement>("#model-groups .model-option");
+    const options = document.querySelectorAll<HTMLButtonElement>(
+      "#model-groups .model-option",
+    );
     expect(options).toHaveLength(1);
     options[0]?.click();
     const select = byId("thinking-select") as HTMLSelectElement;
     select.value = "high";
     select.dispatchEvent(new Event("change"));
-    await vi.waitFor(() => expect(sent.map((c) => c.type)).toContain("set_thinking_level"));
-    expect(sent.filter((c) => !["get_session_stats", "get_state", "get_tree"].includes(String(c.type)))).toEqual([
+    await vi.waitFor(() =>
+      expect(sent.map((c) => c.type)).toContain("set_thinking_level"),
+    );
+    expect(
+      sent.filter(
+        (c) =>
+          !["get_session_stats", "get_state", "get_tree"].includes(
+            String(c.type),
+          ),
+      ),
+    ).toEqual([
       { type: "get_available_models" },
       { type: "set_model", provider: "openrouter", modelId: "openai/gpt-5" },
       { type: "set_thinking_level", level: "high" },
     ]);
-    await vi.waitFor(() => expect(document.querySelector("#model-card .model-card-name")?.textContent).toBe("openai/gpt-5"));
+    await vi.waitFor(() =>
+      expect(
+        document.querySelector("#model-card .model-card-name")?.textContent,
+      ).toBe("openai/gpt-5"),
+    );
   });
 
   it("groups models by vendor, lists recent first and filters across groups", async () => {
     localStorage.clear();
     const { app, conn } = setup({
-      get_state: { success: true, data: { model: { id: "openai/gpt-5", provider: "g" }, thinkingLevel: "low" } },
+      get_state: {
+        success: true,
+        data: {
+          model: { id: "openai/gpt-5", provider: "g" },
+          thinkingLevel: "low",
+        },
+      },
       get_available_models: {
         success: true,
         data: {
@@ -341,19 +479,37 @@ describe("app", () => {
     conn.sessionId = "s1";
     app.model = { id: "openai/gpt-5", provider: "g" };
     app.openSheet();
-    await vi.waitFor(() => expect(document.querySelectorAll("#model-groups details")).toHaveLength(3));
-    const groups = [...document.querySelectorAll<HTMLDetailsElement>("#model-groups details")];
-    expect(groups.map((d) => d.querySelector("summary")?.textContent)).toEqual(["anthropic(2)", "openai(1)", "zai(1)"]);
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll("#model-groups details")).toHaveLength(
+        3,
+      ),
+    );
+    const groups = [
+      ...document.querySelectorAll<HTMLDetailsElement>("#model-groups details"),
+    ];
+    expect(groups.map((d) => d.querySelector("summary")?.textContent)).toEqual([
+      "anthropic(2)",
+      "openai(1)",
+      "zai(1)",
+    ]);
     expect(groups.map((d) => d.open)).toEqual([false, true, false]);
     expect(byId("model-recent").hidden).toBe(false);
-    expect([...document.querySelectorAll("#model-recent .model-option-name")].map((n) => n.textContent)).toEqual(["anthropic/claude-opus-5.5"]);
+    expect(
+      [...document.querySelectorAll("#model-recent .model-option-name")].map(
+        (n) => n.textContent,
+      ),
+    ).toEqual(["anthropic/claude-opus-5.5"]);
 
     const filter = byId("model-filter") as HTMLInputElement;
     filter.value = "claude";
     filter.dispatchEvent(new Event("input"));
     expect(byId("model-recent").hidden).toBe(true);
-    const open = [...document.querySelectorAll<HTMLDetailsElement>("#model-groups details")];
-    expect(open.map((d) => [d.dataset.vendor, d.open])).toEqual([["anthropic", true]]);
+    const open = [
+      ...document.querySelectorAll<HTMLDetailsElement>("#model-groups details"),
+    ];
+    expect(open.map((d) => [d.dataset.vendor, d.open])).toEqual([
+      ["anthropic", true],
+    ]);
 
     filter.value = "nothing-here";
     filter.dispatchEvent(new Event("input"));
@@ -366,9 +522,17 @@ describe("app", () => {
     expect(document.querySelectorAll("#model-groups details")).toHaveLength(3);
     expect(byId("model-state").hidden).toBe(true);
 
-    document.querySelector<HTMLButtonElement>('#model-groups details[data-vendor="zai"] .model-option')?.click();
+    document
+      .querySelector<HTMLButtonElement>(
+        '#model-groups details[data-vendor="zai"] .model-option',
+      )
+      ?.click();
     await vi.waitFor(() =>
-      expect([...document.querySelectorAll("#model-recent .model-option-name")].map((n) => n.textContent)).toEqual(["zai/glm-5", "anthropic/claude-opus-5.5"]),
+      expect(
+        [...document.querySelectorAll("#model-recent .model-option-name")].map(
+          (n) => n.textContent,
+        ),
+      ).toEqual(["zai/glm-5", "anthropic/claude-opus-5.5"]),
     );
     localStorage.clear();
   });
@@ -380,27 +544,74 @@ describe("app", () => {
         success: true,
         data: {
           models: [
-            { provider: "g", id: "anthropic/claude-opus-5.5", reasoning: true, input: ["text", "image"] },
-            { provider: "g", id: "anthropic/claude-haiku-5", reasoning: false, input: ["text", "image"] },
-            { provider: "g", id: "openai/gpt-5", reasoning: true, input: ["text"] },
-            { provider: "g", id: "zai/glm-5", reasoning: false, input: ["text"] },
+            {
+              provider: "g",
+              id: "anthropic/claude-opus-5.5",
+              reasoning: true,
+              input: ["text", "image"],
+            },
+            {
+              provider: "g",
+              id: "anthropic/claude-haiku-5",
+              reasoning: false,
+              input: ["text", "image"],
+            },
+            {
+              provider: "g",
+              id: "openai/gpt-5",
+              reasoning: true,
+              input: ["text"],
+            },
+            {
+              provider: "g",
+              id: "zai/glm-5",
+              reasoning: false,
+              input: ["text"],
+            },
           ],
         },
       },
     });
     conn.sessionId = "s1";
     app.openSheet();
-    await vi.waitFor(() => expect(document.querySelectorAll("#model-groups details")).toHaveLength(3));
-    const chips = [...document.querySelectorAll<HTMLButtonElement>("#model-chips .filter-chip")];
-    expect(chips.map((c) => c.textContent)).toEqual(["Thinking", "Images", "400K+", "Cheap"]);
-    expect(chips.every((c) => c.getAttribute("aria-pressed") === "false")).toBe(true);
-    const chip = (cap: string) => document.querySelector<HTMLButtonElement>(`#model-chips [data-cap="${cap}"]`)!;
-    const names = () => [...document.querySelectorAll("#model-groups .model-option-name")].map((n) => n.textContent);
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll("#model-groups details")).toHaveLength(
+        3,
+      ),
+    );
+    const chips = [
+      ...document.querySelectorAll<HTMLButtonElement>(
+        "#model-chips .filter-chip",
+      ),
+    ];
+    expect(chips.map((c) => c.textContent)).toEqual([
+      "Thinking",
+      "Images",
+      "400K+",
+      "Cheap",
+    ]);
+    expect(chips.every((c) => c.getAttribute("aria-pressed") === "false")).toBe(
+      true,
+    );
+    const chip = (cap: string) =>
+      document.querySelector<HTMLButtonElement>(
+        `#model-chips [data-cap="${cap}"]`,
+      )!;
+    const names = () =>
+      [...document.querySelectorAll("#model-groups .model-option-name")].map(
+        (n) => n.textContent,
+      );
 
     chip("thinking").click();
     expect(chip("thinking").getAttribute("aria-pressed")).toBe("true");
     expect(names()).toEqual(["anthropic/claude-opus-5.5", "openai/gpt-5"]);
-    expect([...document.querySelectorAll<HTMLDetailsElement>("#model-groups details")].every((d) => d.open)).toBe(true);
+    expect(
+      [
+        ...document.querySelectorAll<HTMLDetailsElement>(
+          "#model-groups details",
+        ),
+      ].every((d) => d.open),
+    ).toBe(true);
 
     chip("images").click();
     expect(names()).toEqual(["anthropic/claude-opus-5.5"]);
@@ -431,7 +642,9 @@ describe("app", () => {
       ["openai", "openai (1)"],
       ["zai", "zai (1)"],
     ]);
-    const zai = document.querySelector<HTMLDetailsElement>('#model-groups details[data-vendor="zai"]')!;
+    const zai = document.querySelector<HTMLDetailsElement>(
+      '#model-groups details[data-vendor="zai"]',
+    )!;
     expect(zai.open).toBe(false);
     jump.value = "zai";
     jump.dispatchEvent(new Event("change"));
@@ -443,7 +656,13 @@ describe("app", () => {
 
   it("groups direct-provider ids by vendor, keys recents by provider and drops stale recents", async () => {
     localStorage.clear();
-    localStorage.setItem("porcupine.recentModels", JSON.stringify(["vercel-ai-gateway|anthropic/claude-opus-5.5", "openai|gpt-5"]));
+    localStorage.setItem(
+      "porcupine.recentModels",
+      JSON.stringify([
+        "vercel-ai-gateway|anthropic/claude-opus-5.5",
+        "openai|gpt-5",
+      ]),
+    );
     const mixed = {
       success: true,
       data: {
@@ -457,37 +676,76 @@ describe("app", () => {
     const { app, conn, sent } = setup({ get_available_models: mixed });
     conn.sessionId = "s1";
     app.openSheet();
-    await vi.waitFor(() => expect(document.querySelectorAll("#model-groups details")).toHaveLength(3));
-    const vendors = [...document.querySelectorAll<HTMLDetailsElement>("#model-groups details")].map((d) => d.dataset.vendor).sort();
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll("#model-groups details")).toHaveLength(
+        3,
+      ),
+    );
+    const vendors = [
+      ...document.querySelectorAll<HTMLDetailsElement>("#model-groups details"),
+    ]
+      .map((d) => d.dataset.vendor)
+      .sort();
     expect(vendors).toEqual(["anthropic", "openai", "zai"]);
-    const recents = () => [...document.querySelectorAll("#model-recent .model-option-name")].map((e) => e.textContent);
+    const recents = () =>
+      [...document.querySelectorAll("#model-recent .model-option-name")].map(
+        (e) => e.textContent,
+      );
     expect(recents()).toEqual(["gpt-5"]);
-    expect(document.querySelectorAll("#model-chips [data-provider]")).toHaveLength(0);
-    expect(document.querySelectorAll("#model-chips .filter-chip")).toHaveLength(4);
+    expect(
+      document.querySelectorAll("#model-chips [data-provider]"),
+    ).toHaveLength(0);
+    expect(document.querySelectorAll("#model-chips .filter-chip")).toHaveLength(
+      4,
+    );
 
-    const opus = [...document.querySelectorAll<HTMLButtonElement>("#model-groups .model-option")].find(
-      (b) => b.querySelector(".model-option-name")?.textContent === "claude-opus-5-5",
+    const opus = [
+      ...document.querySelectorAll<HTMLButtonElement>(
+        "#model-groups .model-option",
+      ),
+    ].find(
+      (b) =>
+        b.querySelector(".model-option-name")?.textContent ===
+        "claude-opus-5-5",
     )!;
     opus.click();
-    await vi.waitFor(() => expect(sent).toContainEqual({ type: "set_model", provider: "anthropic", modelId: "claude-opus-5-5" }));
-    await vi.waitFor(() => expect(recents()).toEqual(["claude-opus-5-5", "gpt-5"]));
-    expect(JSON.parse(localStorage.getItem("porcupine.recentModels")!)[0]).toBe("anthropic|claude-opus-5-5");
+    await vi.waitFor(() =>
+      expect(sent).toContainEqual({
+        type: "set_model",
+        provider: "anthropic",
+        modelId: "claude-opus-5-5",
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(recents()).toEqual(["claude-opus-5-5", "gpt-5"]),
+    );
+    expect(JSON.parse(localStorage.getItem("porcupine.recentModels")!)[0]).toBe(
+      "anthropic|claude-opus-5-5",
+    );
     localStorage.clear();
   });
 
   it("shows distinct model sheet states", async () => {
-    const { app, conn } = setup({ get_available_models: { success: true, data: { models: [] } } });
+    const { app, conn } = setup({
+      get_available_models: { success: true, data: { models: [] } },
+    });
     app.openSheet();
-    expect(byId("model-state").textContent).toBe("Not attached: pick a session");
+    expect(byId("model-state").textContent).toBe(
+      "Not attached: pick a session",
+    );
     conn.sessionId = "s1";
     const p = app.loadModels();
     expect(byId("model-state").textContent).toBe("Loading models");
     await p;
-    expect(byId("model-state").textContent).toBe("No models available (check the provider key)");
+    expect(byId("model-state").textContent).toBe(
+      "No models available (check the provider key)",
+    );
   });
 
   it("renders a model load error in the sheet and the transcript", async () => {
-    const { app, conn } = setup({ get_available_models: { success: false, error: "boom" } });
+    const { app, conn } = setup({
+      get_available_models: { success: false, error: "boom" },
+    });
     conn.sessionId = "s1";
     await app.loadModels();
     expect(byId("model-state").textContent).toContain("boom");
@@ -495,7 +753,15 @@ describe("app", () => {
   });
 
   it("disables the thinking select when the model has no reasoning", async () => {
-    const { app, conn } = setup({ get_state: { success: true, data: { model: { id: "m", provider: "p", reasoning: false }, thinkingLevel: "low" } } });
+    const { app, conn } = setup({
+      get_state: {
+        success: true,
+        data: {
+          model: { id: "m", provider: "p", reasoning: false },
+          thinkingLevel: "low",
+        },
+      },
+    });
     conn.sessionId = "s1";
     await app.refreshState();
     const select = byId("thinking-select") as HTMLSelectElement;
@@ -530,7 +796,12 @@ describe("app", () => {
     app.render();
     expect([stop.hidden, send.hidden]).toEqual([true, false]);
     input.value = "";
-    app.pending = [{ file: new File(["x"], "a.txt"), kind: "file" } as (typeof app.pending)[number]];
+    app.pending = [
+      {
+        file: new File(["x"], "a.txt"),
+        kind: "file",
+      } as (typeof app.pending)[number],
+    ];
     app.render();
     expect([stop.hidden, send.hidden]).toEqual([true, false]);
   });
@@ -541,12 +812,22 @@ describe("app", () => {
     app.t.isStreaming = true;
     (document.getElementById("input") as HTMLTextAreaElement).value = "later";
     await app.send();
-    expect(sent).toContainEqual({ type: "prompt", message: "later", images: [], streamingBehavior: "followUp" });
+    expect(sent).toContainEqual({
+      type: "prompt",
+      message: "later",
+      images: [],
+      streamingBehavior: "followUp",
+    });
     expect(document.getElementById("steer")).toBeNull();
   });
 
   it("Stop clears the queue, aborts, and restores queued text ahead of the draft", async () => {
-    const { app, conn, sent } = setup({ clear_queue: { success: true, data: { steering: ["s1"], followUp: ["f1", "f2"] } } });
+    const { app, conn, sent } = setup({
+      clear_queue: {
+        success: true,
+        data: { steering: ["s1"], followUp: ["f1", "f2"] },
+      },
+    });
     conn.sessionId = "s1";
     const input = document.getElementById("input") as HTMLTextAreaElement;
     input.value = "draft";
@@ -556,7 +837,10 @@ describe("app", () => {
   });
 
   /** A fake pi command channel: clear_queue returns the current queue; steer/follow_up append, optionally failing. */
-  function fakePi(start: { steering: string[]; followUp: string[] }, failOn?: string) {
+  function fakePi(
+    start: { steering: string[]; followUp: string[] },
+    failOn?: string,
+  ) {
     const ctx = setup({});
     ctx.conn.sessionId = "s1";
     let q = { steering: [...start.steering], followUp: [...start.followUp] };
@@ -569,8 +853,11 @@ describe("app", () => {
         return Promise.resolve({ success: true, data });
       }
       if (cmd.type === "steer" || cmd.type === "follow_up") {
-        if (cmd.message === failOn) return Promise.resolve({ success: false, error: "nope" });
-        (cmd.type === "steer" ? q.steering : q.followUp).push(cmd.message as string);
+        if (cmd.message === failOn)
+          return Promise.resolve({ success: false, error: "nope" });
+        (cmd.type === "steer" ? q.steering : q.followUp).push(
+          cmd.message as string,
+        );
       }
       return Promise.resolve({ success: true });
     });
@@ -578,7 +865,10 @@ describe("app", () => {
   }
 
   it("cancel requeues the rest in order, one command at a time", async () => {
-    const { app, sent, pi } = fakePi({ steering: ["s1"], followUp: ["f1", "f2", "f3"] });
+    const { app, sent, pi } = fakePi({
+      steering: ["s1"],
+      followUp: ["f1", "f2", "f3"],
+    });
     await app.queueAction(2, "cancel");
     expect(sent.map((c) => [c.type, c.message])).toEqual([
       ["clear_queue", undefined],
@@ -622,11 +912,16 @@ describe("app", () => {
     await app.queueAction(0, "cancel");
     expect(pi()).toEqual({ steering: [], followUp: ["c", "d"] });
     app.render();
-    expect(document.getElementById("transcript")?.textContent).toContain("Queue changed, try again");
+    expect(document.getElementById("transcript")?.textContent).toContain(
+      "Queue changed, try again",
+    );
   });
 
   it("puts failed and remaining texts into the composer when a requeue fails", async () => {
-    const { app } = fakePi({ steering: ["s1"], followUp: ["f1", "f2", "f3"] }, "f1");
+    const { app } = fakePi(
+      { steering: ["s1"], followUp: ["f1", "f2", "f3"] },
+      "f1",
+    );
     const input = document.getElementById("input") as HTMLTextAreaElement;
     input.value = "draft";
     await app.queueAction(0, "cancel");
@@ -648,7 +943,138 @@ describe("app", () => {
     const { app } = fakePi({ steering: ["s1"], followUp: ["f1"] });
     app.renderQueue();
     const chips = document.querySelectorAll("#queue-chips .queue-chip");
-    expect([...chips[0]!.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"))).toEqual(["Edit", "Cancel"]);
-    expect([...chips[1]!.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"))).toEqual(["Edit", "Cancel", "Send now"]);
+    expect(
+      [...chips[0]!.querySelectorAll("button")].map((b) =>
+        b.getAttribute("aria-label"),
+      ),
+    ).toEqual(["Edit", "Cancel"]);
+    expect(
+      [...chips[1]!.querySelectorAll("button")].map((b) =>
+        b.getAttribute("aria-label"),
+      ),
+    ).toEqual(["Edit", "Cancel", "Send now"]);
+  });
+});
+
+describe("compaction hold", () => {
+  function setupHold(reject: () => string | null) {
+    loadShell();
+    const conn = new Connection(
+      { url: "ws://x/ws", storage: null },
+      { onFrame: () => undefined, onStatus: () => undefined },
+    );
+    const sent: Record<string, unknown>[] = [];
+    vi.spyOn(conn, "command").mockImplementation((cmd) => {
+      sent.push(cmd);
+      if (cmd.type === "prompt") {
+        const err = reject();
+        return Promise.resolve(
+          err ? { success: false, error: err } : { success: true },
+        );
+      }
+      if (cmd.type === "get_state")
+        return Promise.resolve({
+          success: true,
+          data: { isCompacting: false },
+        });
+      if (cmd.type === "clear_queue")
+        return Promise.resolve({
+          success: true,
+          data: { steering: [], followUp: ["f1"] },
+        });
+      return Promise.resolve({ success: true });
+    });
+    const app = new App(conn);
+    app.isDesktop = () => false;
+    app.bind();
+    conn.sessionId = "s1";
+    const input = document.getElementById("input") as HTMLTextAreaElement;
+    const submit = async (text: string) => {
+      input.value = text;
+      await app.send();
+    };
+    return { app, sent, input, submit };
+  }
+  const prompts = (sent: Record<string, unknown>[]) =>
+    sent.filter((c) => c.type === "prompt");
+
+  it("holds submits as pending chips and flushes them in order on compaction end", async () => {
+    const { app, sent, submit } = setupHold(() => null);
+    app.onFrame({
+      t: "event",
+      session: "s1",
+      seq: 1,
+      event: { type: "compaction_start" },
+    });
+    await submit("one");
+    await submit("two");
+    expect(prompts(sent)).toHaveLength(0);
+    const chips = document.querySelectorAll("#queue-chips .queue-chip");
+    expect(chips).toHaveLength(2);
+    expect(chips[0]!.textContent).toContain("waiting for compaction");
+    app.onFrame({
+      t: "event",
+      session: "s1",
+      seq: 2,
+      event: { type: "compaction_end" },
+    });
+    await vi.waitFor(() => expect(prompts(sent)).toHaveLength(2));
+    expect(prompts(sent)).toEqual([
+      { type: "prompt", message: "one", images: [] },
+      {
+        type: "prompt",
+        message: "two",
+        images: [],
+        streamingBehavior: "followUp",
+      },
+    ]);
+    expect(app.held).toEqual([]);
+  });
+
+  it("keeps items held when pi still reports compaction, and retries on the next end", async () => {
+    let busy = true;
+    const { app, sent, submit } = setupHold(() =>
+      busy ? "Cannot submit a prompt while compaction is in progress" : null,
+    );
+    app.onFrame({
+      t: "event",
+      session: "s1",
+      seq: 1,
+      event: { type: "compaction_start" },
+    });
+    await submit("one");
+    app.onFrame({
+      t: "event",
+      session: "s1",
+      seq: 2,
+      event: { type: "compaction_end" },
+    });
+    await vi.waitFor(() => expect(prompts(sent)).toHaveLength(1));
+    await vi.waitFor(() => expect(app.compacting).toBe(true));
+    expect(app.held).toEqual(["one"]);
+    busy = false;
+    app.onFrame({
+      t: "event",
+      session: "s1",
+      seq: 3,
+      event: { type: "compaction_end" },
+    });
+    await vi.waitFor(() => expect(app.held).toEqual([]));
+    expect(prompts(sent).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("Stop restores held texts after pi's queue", async () => {
+    const { app, input, submit } = setupHold(() => null);
+    app.onFrame({
+      t: "event",
+      session: "s1",
+      seq: 1,
+      event: { type: "compaction_start" },
+    });
+    await submit("held");
+    input.value = "draft";
+    await app.abort();
+    expect(input.value).toBe("f1\n\nheld\n\ndraft");
+    expect(app.held).toEqual([]);
   });
 });
