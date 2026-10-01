@@ -13,6 +13,7 @@ import {
   type UploadsConfig,
 } from "./attachments.js";
 import { StatusPanel } from "./status-panel.js";
+import { autocompactCommand, contextPercent, contextText, parseContextUsage, type ContextInfo } from "./context.js";
 import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
 import { TranscriptView } from "./render.js";
 import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./transcript.js";
@@ -110,6 +111,8 @@ export class App {
   private sessionsLoaded = false;
   models: ModelInfo[] = [];
   model: ModelInfo | null = null;
+  context: ContextInfo | null = null;
+  compacting = false;
   thinkingLevel = "off";
   connState: "connecting" | "open" | "closed" = "closed";
   /** Open overlays, bottom to top. */
@@ -216,6 +219,8 @@ export class App {
     this.buildChips();
     ($("vendor-jump") as HTMLSelectElement).addEventListener("change", (e) => this.jumpToVendor(e.target as HTMLSelectElement));
     $("new-session").addEventListener("click", () => void this.newSession());
+    $("compact-now").addEventListener("click", () => void this.compactNow());
+    $("autocompact-save").addEventListener("click", () => void this.saveAutocompact());
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && e.target !== this.input && document.activeElement !== this.input && this.t.isStreaming) void this.abort();
     });
@@ -274,6 +279,7 @@ export class App {
     this.open("sheet", "sheet-title", opener);
     this.renderHeader();
     void this.loadModels();
+    void this.refreshContext();
   }
 
   openSettings(): void {
@@ -407,6 +413,11 @@ export class App {
         else {
           applyEvent(this.t, f.event);
           if (this.dialogs.apply(f.event)) this.syncDialog();
+          if (f.event.type === "agent_end" || f.event.type === "compaction_end") void this.refreshContext();
+          if (f.event.type === "compaction_start") {
+            this.compacting = true;
+            this.renderContext();
+          }
           if (f.event.type === "thinking_level_changed" && typeof f.event.level === "string") {
             this.thinkingLevel = f.event.level;
             this.renderHeader();
@@ -434,6 +445,9 @@ export class App {
       this.t = emptyTranscript();
       this.view.clear();
       this.model = null;
+      this.context = null;
+      this.compacting = false;
+      this.renderContext();
     }
     this.resetModels();
     this.conn.attach(id);
@@ -486,7 +500,9 @@ export class App {
     if ("model" in d) this.model = parseModel(d.model);
     if (typeof d.thinkingLevel === "string") this.thinkingLevel = d.thinkingLevel;
     if (typeof d.isStreaming === "boolean") this.t.isStreaming = d.isStreaming;
+    if (typeof d.isCompacting === "boolean") this.compacting = d.isCompacting;
     this.renderHeader();
+    void this.refreshContext();
     this.renderAttachments();
     this.queueRender();
   }
@@ -598,6 +614,57 @@ export class App {
       this.notice("error", `prompt rejected: ${r.error ?? "unknown error"}`);
       void this.refreshState();
     }
+  }
+
+  /** Polls get_session_stats and get_state for the context meter. */
+  async refreshContext(): Promise<void> {
+    const sid = this.conn.sessionId;
+    if (!sid) {
+      this.context = null;
+      this.renderContext();
+      return;
+    }
+    const [stats, state] = await Promise.all([this.conn.command({ type: "get_session_stats" }), this.conn.command({ type: "get_state" })]);
+    if (this.conn.sessionId !== sid) return;
+    this.context = stats.success ? parseContextUsage(stats.data) : null;
+    if (state.success && isRec(state.data) && typeof state.data.isCompacting === "boolean") this.compacting = state.data.isCompacting;
+    this.renderContext();
+  }
+
+  renderContext(): void {
+    const c = this.context;
+    const meter = $("context-meter") as HTMLMeterElement;
+    meter.value = c?.percent ?? 0;
+    $("context-text").textContent = this.compacting ? `${contextText(c)} (compacting)` : contextText(c);
+    const pct = $("context-pct");
+    const label = contextPercent(c);
+    pct.textContent = label ? `${label} ctx` : "";
+    pct.title = label ? `Context used: ${contextText(c)}` : "";
+    pct.hidden = label === null || this.conn.sessionId === null;
+    const attached = this.conn.sessionId !== null;
+    ($("compact-now") as HTMLButtonElement).disabled = !attached || this.compacting;
+    ($("autocompact-save") as HTMLButtonElement).disabled = !attached;
+  }
+
+  async compactNow(): Promise<void> {
+    if (!this.conn.sessionId || this.compacting) return;
+    this.compacting = true;
+    this.renderContext();
+    const r = await this.conn.command({ type: "compact" });
+    this.compacting = false;
+    if (!r.success) this.notice("error", `compact: ${r.error ?? "failed"}`);
+    void this.refreshContext();
+  }
+
+  async saveAutocompact(): Promise<void> {
+    if (!this.conn.sessionId) return;
+    const msg = autocompactCommand(($("autocompact-input") as HTMLInputElement).value, ($("autocompact-off") as HTMLInputElement).checked);
+    if (msg === null) {
+      this.notice("error", "auto-compact: enter a positive whole number of tokens");
+      return;
+    }
+    const r = await this.conn.command(buildPrompt(msg, this.t.isStreaming, "followUp"));
+    if (!r.success) this.notice("error", `auto-compact: ${r.error ?? "failed"}`);
   }
 
   async abort(): Promise<void> {
