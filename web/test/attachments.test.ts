@@ -8,7 +8,8 @@ import {
   estimateUsd,
   formatDuration,
   needsConfirm,
-  NO_VISION_WARNING,
+  showNotice,
+  textOnly,
   renderChips,
   renderConfirm,
   sendWithAttachments,
@@ -33,20 +34,31 @@ describe("classify", () => {
 });
 
 describe("chipWarning", () => {
-  const text = { input: ["text"] };
-  const vision = { input: ["text", "image"] };
-  it("warns for visual kinds on text-only models", () => {
-    expect(chipWarning("image", text)).toBe(NO_VISION_WARNING);
-    expect(chipWarning("video", text)).toBe(NO_VISION_WARNING);
-    expect(chipWarning("pdf", text)).toBe(NO_VISION_WARNING);
-    expect(chipWarning("audio", text)).toBeUndefined();
-    expect(chipWarning("image", vision)).toBeUndefined();
+  it("leaves vision to the modal and flags size and whisper", () => {
+    expect(chipWarning("image")).toBeUndefined();
+    expect(chipWarning("audio", 3 * 1024 ** 3)).toBe("Too large (max 2.0 GB)");
+    expect(chipWarning("audio", 10, 100, false)).toMatch(/whisper/);
   });
-  it("warns on size over the cap", () => {
-    expect(chipWarning("audio", vision, 3 * 1024 ** 3)).toBe("Too large (max 2.0 GB)");
+});
+
+describe("textOnly", () => {
+  it("is true only for a known model without image input", () => {
+    expect(textOnly({ input: ["text"] })).toBe(true);
+    expect(textOnly({ input: ["text", "image"] })).toBe(false);
+    expect(textOnly(null)).toBe(false);
   });
-  it("warns when whisper is missing", () => {
-    expect(chipWarning("audio", vision, 10, 100, false)).toMatch(/whisper/);
+});
+
+describe("showNotice", () => {
+  it("opens a dialog, runs the action and removes itself", () => {
+    let ran = false;
+    const dlg = showNotice("T", "B", [{ label: "Go", run: () => (ran = true) }]);
+    expect(document.body.contains(dlg)).toBe(true);
+    expect(dlg.querySelector("h2")?.textContent).toBe("T");
+    (dlg.querySelector("button") as HTMLButtonElement).click();
+    dlg.dispatchEvent(new Event("close"));
+    expect(ran).toBe(true);
+    expect(document.body.contains(dlg)).toBe(false);
   });
 });
 
@@ -105,10 +117,10 @@ describe("DOM", () => {
     loadShell();
     const box = document.getElementById("attachments") as HTMLElement;
     const onRemove = vi.fn();
-    const pending: Pending[] = [{ file: new File(["abc"], "a.png", { type: "image/png" }), kind: "image", warn: NO_VISION_WARNING }];
+    const pending: Pending[] = [{ file: new File(["abc"], "a.png", { type: "image/png" }), kind: "image", warn: "Too large" }];
     renderChips(box, pending, onRemove);
     expect(box.hidden).toBe(false);
-    const chip = box.querySelector(".chip") as HTMLElement;
+    const chip = box.querySelector(".attach-chip") as HTMLElement;
     expect(chip.dataset.warn).toBe("true");
     expect(chip.querySelector(".chip-name")?.textContent).toBe("a.png");
     (chip.querySelector(".chip-remove") as HTMLButtonElement).click();

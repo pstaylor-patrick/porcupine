@@ -94,20 +94,22 @@ export function formatDuration(sec: number): string {
   return h > 0 ? `${h}h${String(m).padStart(2, "0")}m${String(r).padStart(2, "0")}s` : `${m}m${String(r).padStart(2, "0")}s`;
 }
 
-export const NO_VISION_WARNING = "This model cannot see images; frames and scanned pages will be skipped";
 export const NO_WHISPER_WARNING = "Needs whisper.cpp for transcription";
 
-/** The warning a chip shows, or undefined. Size beats capability warnings. */
+/** True when the model is known and cannot take image input. */
+export function textOnly(model: Pick<ModelInfo, "input"> | null): boolean {
+  return model !== null && !model.input?.includes("image");
+}
+
+/** The warning a chip shows, or undefined. Size beats capability warnings. Vision is handled by a modal, not here. */
 export function chipWarning(
   kind: Kind,
-  model: Pick<ModelInfo, "input"> | null,
   size = 0,
   maxBytes = DEFAULT_MAX_BYTES,
   whisper = true,
 ): string | undefined {
   if (size > maxBytes) return `Too large (max ${formatBytes(maxBytes)})`;
   if ((kind === "audio" || kind === "video") && !whisper) return NO_WHISPER_WARNING;
-  if ((kind === "image" || kind === "video" || kind === "pdf") && model && !model.input?.includes("image")) return NO_VISION_WARNING;
   return undefined;
 }
 
@@ -168,7 +170,7 @@ export function renderChips(container: HTMLElement, pending: readonly Pending[],
   container.replaceChildren(
     ...pending.map((p, i) => {
       const chip = document.createElement("div");
-      chip.className = "chip";
+      chip.className = "attach-chip";
       chip.dataset.kind = p.kind;
       if (p.warn) chip.dataset.warn = "true";
       const icon = document.createElement("span");
@@ -376,4 +378,44 @@ export async function sendWithAttachments(ctx: SendContext): Promise<string | nu
     return { ...r, durationSec: r.durationSec ?? u?.probe.durationSec, pages: r.pages ?? u?.probe.pages };
   });
   return buildAttachmentBlock(ctx.message, merged);
+}
+
+export interface NoticeAction {
+  label: string;
+  primary?: boolean;
+  run?: () => void;
+}
+
+/** A modal alert; any action closes it, then runs. Escape and backdrop clicks close it too. */
+export function showNotice(title: string, body: string, actions: NoticeAction[] = [{ label: "OK", primary: true }]): HTMLDialogElement {
+  const dlg = document.createElement("dialog");
+  dlg.className = "notice";
+  dlg.setAttribute("aria-labelledby", "notice-title");
+  const h = document.createElement("h2");
+  h.id = "notice-title";
+  h.textContent = title;
+  const p = document.createElement("p");
+  p.textContent = body;
+  const row = document.createElement("div");
+  row.className = "notice-actions";
+  for (const a of actions) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = a.primary ? "primary" : "secondary";
+    b.textContent = a.label;
+    b.addEventListener("click", () => {
+      dlg.close();
+      a.run?.();
+    });
+    row.append(b);
+  }
+  dlg.append(h, p, row);
+  dlg.addEventListener("click", (e) => {
+    if (e.target === dlg) dlg.close();
+  });
+  dlg.addEventListener("close", () => dlg.remove());
+  document.body.append(dlg);
+  if (typeof dlg.showModal === "function") dlg.showModal();
+  else dlg.setAttribute("open", "");
+  return dlg;
 }

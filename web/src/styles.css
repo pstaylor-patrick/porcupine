@@ -361,8 +361,8 @@ details > :not(summary) { padding: 0 12px 10px; }
 .composer .icon-attach { width: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--bg); color: var(--fg); border: 1px solid var(--line); }
 .composer .icon-attach:disabled, .composer .chip-remove:disabled { opacity: 0.5; }
 .attachments { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 100%; padding: 4px 4px 4px 10px; border-radius: 16px; border: 1px solid var(--line); background: var(--bg); font-size: 14px; }
-.chip[data-warn] { border-color: var(--fg); border-style: dashed; }
+.attach-chip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 100%; padding: 4px 4px 4px 10px; border-radius: 16px; border: 1px solid var(--line); background: var(--bg); font-size: 14px; }
+.attach-chip[data-warn] { border-color: var(--fg); border-style: dashed; }
 .chip-kind { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); }
 .chip-name { min-width: 0; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip-meta { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -418,7 +418,7 @@ details > :not(summary) { padding: 0 12px 10px; }
 .dialog-actions .primary:disabled { opacity: 0.5; cursor: default; }
 .question { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .question legend { font-weight: 600; padding: 0; margin-bottom: 8px; overflow-wrap: anywhere; }
-.chip { display: inline-block; font-size: 0.75em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg); background: var(--user); border-radius: 999px; padding: 2px 8px; margin-right: 8px; vertical-align: middle; }
+.q-chip { display: inline-block; font-size: 0.75em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg); background: var(--user); border-radius: 999px; padding: 2px 8px; margin-right: 8px; vertical-align: middle; }
 .choice { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); cursor: pointer; }
 .choice:has(input:checked) { border-color: var(--accent); background: var(--user); }
 .choice input[type="radio"], .choice input[type="checkbox"] { width: 20px; height: 20px; margin: 2px 0 0; flex: none; }
@@ -480,3 +480,9 @@ details > :not(summary) { padding: 0 12px 10px; }
 .context-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .context-row input[type="number"] { flex: 1 1 8rem; min-width: 0; }
 .context-pct { font-size: 0.75rem; color: var(--muted, inherit); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.notice { max-width: min(420px, calc(100vw - 32px)); padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--fg); }
+.notice::backdrop { background: rgb(0 0 0 / 0.4); }
+.notice h2 { margin: 0 0 8px; font-size: 18px; }
+.notice p { margin: 0 0 16px; line-height: 1.4; }
+.notice-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }

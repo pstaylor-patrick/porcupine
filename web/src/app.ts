@@ -1,6 +1,8 @@
 /** App controller: wires the connection, transcript model, renderer and composer together. */
 import {
   chipWarning,
+  showNotice,
+  textOnly,
   classify,
   DEFAULT_MAX_BYTES,
   http as uploadsHttp,
@@ -194,7 +196,28 @@ export class App {
     });
     $("abort").addEventListener("click", () => void this.abort());
     const fileInput = $("file-input") as HTMLInputElement;
-    $("attach").addEventListener("click", () => fileInput.click());
+    const allTypes = fileInput.accept;
+    $("attach").addEventListener("click", () => {
+      if (!textOnly(this.model)) {
+        fileInput.accept = allTypes;
+        fileInput.click();
+        return;
+      }
+      showNotice(
+        `${this.model?.name ?? "This model"} can't see images`,
+        "Pick a vision model in settings to attach images. PDFs, audio, video and text still work: the model gets their text and transcripts, without pictures.",
+        [
+          { label: "OK", primary: true },
+          {
+            label: "Attach other files",
+            run: () => {
+              fileInput.accept = allTypes.split(",").filter((t) => t !== "image/*").join(",");
+              fileInput.click();
+            },
+          },
+        ],
+      );
+    });
     fileInput.addEventListener("change", () => {
       this.addFiles(Array.from(fileInput.files ?? []));
       fileInput.value = "";
@@ -540,9 +563,17 @@ export class App {
   }
 
   renderAttachments(): void {
+    if (!this.sending && textOnly(this.model) && this.pending.some((p) => p.kind === "image")) {
+      const n = this.pending.length;
+      this.pending = [];
+      showNotice(
+        `${this.model?.name ?? "This model"} can't see images`,
+        `Removed ${n === 1 ? "the attachment" : `all ${n} attachments`}. Pick a vision model in settings, then attach again.`,
+      );
+    }
     const cfg = this.uploadsConfig;
     for (const p of this.pending) {
-      p.warn = chipWarning(p.kind, this.model, p.file.size, cfg?.maxBytes ?? DEFAULT_MAX_BYTES, cfg?.whisper ?? true);
+      p.warn = chipWarning(p.kind, p.file.size, cfg?.maxBytes ?? DEFAULT_MAX_BYTES, cfg?.whisper ?? true);
     }
     renderChips($("attachments"), this.pending, (i) => this.removeAttachment(i), this.sending);
     ($("attach") as HTMLButtonElement).disabled = this.sending || this.conn.sessionId === null;

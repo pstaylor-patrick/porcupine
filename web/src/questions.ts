@@ -162,7 +162,7 @@ function renderInput(d: Extract<Dialog, { kind: "input" }>, answer: Answer): Ren
 function questionField(q: AskQuestion, name: string, changed: () => void): { set: HTMLFieldSetElement; read: () => string } {
   const set = el("fieldset", { class: "question" });
   const legend = el("legend", {}, q.question);
-  if (q.header) legend.prepend(el("span", { class: "chip" }, q.header));
+  if (q.header) legend.prepend(el("span", { class: "q-chip" }, q.header));
   set.append(legend);
   const type = q.multiSelect ? "checkbox" : "radio";
   const choice = (value: string, label: Node): HTMLLabelElement => {
