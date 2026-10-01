@@ -123,14 +123,17 @@
         </div>
         <div class="field" id="context-block">
           <span class="field-label" id="context-label">Context</span>
-          <meter id="context-meter" min="0" max="100" low="60" high="80" optimum="0" value="0" aria-labelledby="context-label"></meter>
+          <div id="context-meter" class="ctx-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="context-label"><span class="ctx-fill"></span></div>
           <p id="context-text" class="field-hint" role="status" aria-live="polite">unknown</p>
-          <label class="field-hint" for="autocompact-input">Auto-compact at (tokens, empty for default)</label>
+          <div class="autocompact-head">
+            <label for="autocompact-input">Auto-compact</label>
+            <label class="switch"><input id="autocompact-on" type="checkbox" role="switch" checked aria-label="Auto-compact on" /><span aria-hidden="true"></span></label>
+          </div>
           <div class="context-row">
-            <input id="autocompact-input" type="number" min="1" step="1000" inputmode="numeric" placeholder="default" />
-            <label class="toggle"><input id="autocompact-off" type="checkbox" /> Off</label>
+            <input id="autocompact-input" type="text" inputmode="numeric" autocomplete="off" placeholder="Default threshold" aria-describedby="autocompact-hint" />
             <button id="autocompact-save" type="button" class="secondary">Save</button>
           </div>
+          <p id="autocompact-hint" class="field-hint">Tokens. Leave empty for the default.</p>
           <button id="compact-now" type="button" class="secondary">Compact now</button>
         </div>
         <div class="field" id="session-usage-block">

@@ -27,7 +27,7 @@ import {
   type SessionUsage,
   type UsageReport,
 } from "./usage.js";
-import { autocompactCommand, contextPercent, contextText, parseContextUsage, type ContextInfo } from "./context.js";
+import { autocompactCommand, contextPercent, groupDigits, contextText, parseContextUsage, type ContextInfo } from "./context.js";
 import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
 import { TranscriptView } from "./render.js";
 import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./transcript.js";
@@ -265,6 +265,16 @@ export class App {
     $("new-session").addEventListener("click", () => void this.newSession());
     $("compact-now").addEventListener("click", () => void this.compactNow());
     $("autocompact-save").addEventListener("click", () => void this.saveAutocompact());
+    const threshold = $("autocompact-input") as HTMLInputElement;
+    threshold.addEventListener("input", () => {
+      const fromEnd = threshold.value.length - (threshold.selectionStart ?? threshold.value.length);
+      threshold.value = groupDigits(threshold.value);
+      const at = Math.max(0, threshold.value.length - fromEnd);
+      threshold.setSelectionRange(at, at);
+    });
+    $("autocompact-on").addEventListener("change", (e) => {
+      threshold.disabled = !(e.target as HTMLInputElement).checked;
+    });
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && e.target !== this.input && document.activeElement !== this.input && this.t.isStreaming) void this.abort();
     });
@@ -740,8 +750,11 @@ export class App {
 
   renderContext(): void {
     const c = this.context;
-    const meter = $("context-meter") as HTMLMeterElement;
-    meter.value = c?.percent ?? 0;
+    const pctUsed = Math.min(100, Math.max(0, c?.percent ?? 0));
+    const meter = $("context-meter");
+    meter.setAttribute("aria-valuenow", String(Math.round(pctUsed)));
+    meter.dataset.level = pctUsed >= 80 ? "high" : "ok";
+    (meter.firstElementChild as HTMLElement).style.width = `${pctUsed}%`;
     $("context-text").textContent = this.compacting ? `${contextText(c)} (compacting)` : contextText(c);
     const pct = $("context-pct");
     const label = contextPercent(c);
@@ -771,7 +784,7 @@ export class App {
 
   async saveAutocompact(): Promise<void> {
     if (!this.conn.sessionId) return;
-    const msg = autocompactCommand(($("autocompact-input") as HTMLInputElement).value, ($("autocompact-off") as HTMLInputElement).checked);
+    const msg = autocompactCommand(($("autocompact-input") as HTMLInputElement).value, !($("autocompact-on") as HTMLInputElement).checked);
     if (msg === null) {
       this.notice("error", "auto-compact: enter a positive whole number of tokens");
       return;

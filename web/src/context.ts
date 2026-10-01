@@ -33,7 +33,13 @@ export function contextPercent(c: ContextInfo | null): string | null {
 /** The /autocompact command for the sheet's field; null when the value is invalid. */
 export function autocompactCommand(raw: string, off: boolean): string | null {
   if (off) return "/autocompact off";
-  const v = raw.trim();
+  const v = raw.replace(/[,\s]/g, "");
   if (v === "") return "/autocompact default";
   return /^\d+$/.test(v) && Number(v) > 0 ? `/autocompact ${v}` : null;
+}
+
+/** Groups the digits of a token count with commas as it is typed; other characters are dropped. */
+export function groupDigits(raw: string): string {
+  const digits = raw.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }

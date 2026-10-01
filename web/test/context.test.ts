@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autocompactCommand, contextPercent, contextText, parseContextUsage } from "../src/context.js";
+import { autocompactCommand, contextPercent, groupDigits, contextText, parseContextUsage } from "../src/context.js";
 
 describe("context meter", () => {
   it("parses and formats stats", () => {
@@ -14,5 +14,13 @@ describe("context meter", () => {
     expect(autocompactCommand("", false)).toBe("/autocompact default");
     expect(autocompactCommand("150000", false)).toBe("/autocompact 150000");
     expect(autocompactCommand("1.5", false)).toBeNull();
+    expect(autocompactCommand("250,000", false)).toBe("/autocompact 250000");
+  });
+
+  it("groups digits with commas", () => {
+    expect(groupDigits("250000")).toBe("250,000");
+    expect(groupDigits("1,0000")).toBe("10,000");
+    expect(groupDigits("12a3")).toBe("123");
+    expect(groupDigits("")).toBe("");
   });
 });

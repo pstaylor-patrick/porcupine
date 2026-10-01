@@ -476,9 +476,20 @@ details > :not(summary) { padding: 0 12px 10px; }
 .status-widget { margin: 0; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); max-height: 30vh; overflow: auto; }
 
 /* Context meter (session sheet) and header percent */
-#context-meter { width: 100%; height: 12px; }
-.context-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.context-row input[type="number"] { flex: 1 1 8rem; min-width: 0; }
+.ctx-bar { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.ctx-fill { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--crayon); transition: width 0.3s ease; }
+.ctx-bar[data-level="high"] .ctx-fill { background: var(--fg); }
+.autocompact-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.context-row { display: flex; align-items: stretch; gap: 8px; }
+.context-row input { flex: 1 1 auto; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; font-size: 16px; font-variant-numeric: tabular-nums; }
+.context-row input:disabled { opacity: 0.45; }
+.switch { position: relative; display: inline-flex; flex: none; cursor: pointer; }
+.switch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.switch span { width: 44px; height: 26px; border-radius: 999px; background: var(--line); transition: background 0.2s ease; }
+.switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--bg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.25); transition: transform 0.2s ease; }
+.switch input:checked + span { background: var(--crayon); }
+.switch input:checked + span::after { transform: translateX(18px); }
+.switch input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
 .context-pct { font-size: 0.75rem; color: var(--muted, inherit); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .notice { max-width: min(420px, calc(100vw - 32px)); padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--fg); }
