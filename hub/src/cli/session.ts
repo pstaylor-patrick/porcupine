@@ -6,7 +6,7 @@ import { EventLog, type EventLogLimits } from "./event-log.js";
 import type { LogFn } from "./log.js";
 import { PiProcess } from "./pi-process.js";
 import { SocketServer } from "./socket-server.js";
-import { handleUiRequest } from "./ui-autocancel.js";
+import { handleUiRequest, UiStateStore } from "./ui-autocancel.js";
 import { slugify } from "./args.js";
 import { filterModelsResponse, rejectSetModel } from "./routing.js";
 
@@ -70,7 +70,9 @@ export async function startSession(o: SessionOptions): Promise<Session> {
   };
 
   let server: SocketServer | null = null;
+  const uiState = new UiStateStore();
   const publish = (event: PiEvent): void => {
+    uiState.apply(event);
     const entry = events.append(event);
     server?.broadcast({ t: "event", seq: entry.seq, event: entry.event });
   };
@@ -169,6 +171,7 @@ export async function startSession(o: SessionOptions): Promise<Session> {
       path: paths.sock,
       log: events,
       meta: () => meta,
+      snapshot: () => uiState.snapshot(),
       send: (cmd) => (cmd.type === "extension_ui_response" ? answerDialog(cmd) : sendToPi(cmd)),
       onConnect: () => o.log("hub connected"),
       onDisconnect: () => o.log("hub disconnected"),

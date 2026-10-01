@@ -90,6 +90,10 @@ function handle(cmd) {
         out({ type: "extension_ui_request", id, method: "confirm", title: "Allow?", message: "Really?" });
         return;
       }
+      if (cmd.message === "__status__") {
+        out({ type: "extension_ui_request", id: "s1", method: "setStatus", statusKey: "loop", statusText: "every 5m" });
+        out({ type: "extension_ui_request", id: "s2", method: "setTitle", title: "pi - fake" });
+      }
       if (cmd.message === "__slow__") return; // never answered
       respond(cmd, { disposition: "started" });
       return setImmediate(() => runPrompt(cmd.message));

@@ -12,6 +12,7 @@ import {
   type Pending,
   type UploadsConfig,
 } from "./attachments.js";
+import { StatusPanel } from "./status-panel.js";
 import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
 import { TranscriptView } from "./render.js";
 import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./transcript.js";
@@ -117,6 +118,7 @@ export class App {
   isDesktop: () => boolean = () => typeof window.matchMedia === "function" && window.matchMedia("(min-width: 900px)").matches;
   navigate: (url: string) => void = (url) => location.assign(url);
   readonly dialogs = new DialogQueue();
+  readonly statusPanel = new StatusPanel();
   /** The dialog shown in the sheet; hiding the sheet keeps it pending. */
   private shownDialog: Dialog | null = null;
   private readonly returnFocus = new Map<Overlay, HTMLElement | null>();
@@ -400,6 +402,7 @@ export class App {
         void this.rebuild();
         return;
       case "event":
+        if (this.statusPanel.apply(f.event)) this.renderStatusPanel();
         if (this.resetting) this.resetBuffer.push(f.event);
         else {
           applyEvent(this.t, f.event);
@@ -426,6 +429,8 @@ export class App {
     if (id !== this.conn.sessionId) {
       this.dialogs.clear();
       this.syncDialog();
+      this.statusPanel.clear();
+      this.renderStatusPanel();
       this.t = emptyTranscript();
       this.view.clear();
       this.model = null;
@@ -831,6 +836,11 @@ export class App {
     }
   }
 
+  renderStatusPanel(): void {
+    this.statusPanel.render($("status-panel"));
+    this.renderHeader();
+  }
+
   renderHeader(): void {
     this.renderModelCard();
     const thinking = $("thinking-select") as HTMLSelectElement;
@@ -839,8 +849,9 @@ export class App {
     thinking.value = noReasoning ? "off" : this.thinkingLevel;
     const s = this.sessions.find((x) => x.id === this.conn.sessionId);
     const title = $("session-title");
-    title.textContent = s ? s.name : "Porcupine";
-    title.title = s ? s.name : "";
+    const name = s ? (this.statusPanel.title ?? s.name) : "Porcupine";
+    title.textContent = name;
+    title.title = s ? name : "";
     title.setAttribute("aria-label", s ? `Session settings for ${s.name}` : "Session settings");
     $("session-card-name").textContent = s ? s.name : "No session";
     const cwd = $("session-card-cwd");

@@ -16,6 +16,15 @@ export const ALLOWED_PI_COMMANDS = [
   "set_thinking_level",
   "compact",
   "extension_ui_response",
+  "get_session_stats",
+  "set_auto_compaction",
+  "get_commands",
+  "fork",
+  "clone",
+  "switch_session",
+  "get_tree",
+  "set_session_name",
+  "abort_retry",
 ] as const;
 
 export type AllowedPiCommand = (typeof ALLOWED_PI_COMMANDS)[number];
@@ -108,3 +117,31 @@ export interface PorcupineNotice {
   text: string;
 }
 
+
+/** Extension setStatus, forwarded; text null clears the key. */
+export interface PorcupineUiStatus {
+  type: "porcupine_ui_status";
+  key: string;
+  text: string | null;
+}
+
+/** Extension setWidget (string lines only), forwarded; lines null clears the key. */
+export interface PorcupineUiWidget {
+  type: "porcupine_ui_widget";
+  key: string;
+  lines: string[] | null;
+}
+
+/** Extension setTitle, forwarded. */
+export interface PorcupineUiTitle {
+  type: "porcupine_ui_title";
+  title: string;
+}
+
+export type PorcupineUiStateEvent = PorcupineUiStatus | PorcupineUiWidget | PorcupineUiTitle;
+
+/** Last-known UI state, sent once after a replay reset. */
+export interface PorcupineUiSnapshot {
+  type: "porcupine_ui_snapshot";
+  events: PiEvent[];
+}

@@ -357,7 +357,7 @@ details > :not(summary) { padding: 0 12px 10px; }
 .danger { background: var(--fg); color: var(--bg); }
 .composer .icon-send { width: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
 .composer { flex-wrap: wrap; }
-.composer .attachments, .composer .attach-confirm, .composer .attach-status { flex: 1 0 100%; order: -1; }
+.composer .status-panel, .composer .attachments, .composer .attach-confirm, .composer .attach-status { flex: 1 0 100%; order: -1; }
 .composer .icon-attach { width: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--bg); color: var(--fg); border: 1px solid var(--line); }
 .composer .icon-attach:disabled, .composer .chip-remove:disabled { opacity: 0.5; }
 .attachments { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -468,3 +468,9 @@ details > :not(summary) { padding: 0 12px 10px; }
 .filter-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .vendor-jump { min-height: 44px; width: 100%; margin-bottom: 8px; }
 .vendor-jump[hidden] { display: none; }
+
+.status-panel { display: flex; flex-direction: column; gap: 6px; }
+.status-panel[hidden] { display: none; }
+.status-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.status-chip { font-size: 13px; color: var(--muted); border: 1px solid currentColor; border-radius: 999px; padding: 2px 8px; }
+.status-widget { margin: 0; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); max-height: 30vh; overflow: auto; }

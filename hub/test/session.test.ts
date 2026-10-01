@@ -119,7 +119,7 @@ describe("porcupine session", () => {
     c.send({ t: "cmd", cid: "a", cmd: { type: "get_state", id: "evil" } });
     c.send({ t: "cmd", cid: "b", cmd: { type: "get_messages" } });
     c.send({ t: "cmd", cid: "c", cmd: { type: "bash", command: "rm -rf /" } });
-    c.send({ t: "cmd", cid: "d", cmd: { type: "switch_session" } });
+    c.send({ t: "cmd", cid: "d", cmd: { type: "export_html" } });
     const a = await c.until((f) => f.t === "result" && f.cid === "a");
     const b = await c.until((f) => f.t === "result" && f.cid === "b");
     const cc = await c.until((f) => f.t === "result" && f.cid === "c");
@@ -204,6 +204,39 @@ describe("porcupine session", () => {
     const c2 = await Client.open(session.paths.sock);
     c2.send({ t: "hello", proto: 1, since: 1 });
     await c2.until((f) => f.t === "reset");
+    c2.close();
+  });
+
+  it("replays forwarded extension UI state after a reset that evicted it", async () => {
+    dir = mkdtempSync(join(tmpdir(), "porcupine-test-"));
+    session = await startSession({
+      name: "status",
+      cwd: dir,
+      piBin: FAKE_PI,
+      piArgs: buildPiArgs([]),
+      childEnv: process.env,
+      runtimeDir: join(dir, "run"),
+      log: () => undefined,
+      limits: { maxEvents: 2, maxBytes: 1e9 },
+      stdinGraceMs: 500,
+      termGraceMs: 500,
+    });
+    const c = await Client.open(session.paths.sock);
+    c.send({ t: "hello", proto: 1, since: 0 });
+    await c.until((f) => f.t === "welcome");
+    c.send({ t: "cmd", cid: "p", cmd: { type: "prompt", message: "__status__", images: [] } });
+    await c.until((f) => f.t === "event" && f.event.type === "porcupine_ui_status");
+    await c.until((f) => f.t === "event" && f.event.type === "agent_settled");
+    c.close();
+    const c2 = await Client.open(session.paths.sock);
+    c2.send({ t: "hello", proto: 1, since: null });
+    const snap = await c2.until((f) => f.t === "event" && f.event.type === "porcupine_ui_snapshot");
+    expect(snap.t === "event" && snap.event.events).toEqual([
+      { type: "porcupine_ui_status", key: "loop", text: "every 5m" },
+      { type: "porcupine_ui_title", title: "pi - fake" },
+    ]);
+    const seqs = c2.frames.flatMap((f) => (f.t === "event" ? [f.seq] : []));
+    expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
     c2.close();
   });
 

@@ -5,6 +5,8 @@ import {
   isAllowedCommand,
   type CliToHubFrame,
   type PiCommand,
+  type PiEvent,
+  type PorcupineUiSnapshot,
   type PiResponse,
   type SessionMeta,
 } from "../shared/protocol.js";
@@ -15,6 +17,8 @@ export interface SocketServerOptions {
   log: EventLog;
   meta: () => SessionMeta;
   send: (cmd: PiCommand) => Promise<PiResponse>;
+  /** State events sent after a reset, ahead of the replayed log, so evicted state survives. */
+  snapshot?: () => PiEvent[];
   onConnect?: () => void;
   onDisconnect?: () => void;
 }
@@ -77,7 +81,15 @@ export class SocketServer {
         oldestSeq: log.oldestSeq,
       });
       const replay = log.since(since);
-      if (replay.reset) this.write(sock, { t: "reset" });
+      if (replay.reset) {
+        this.write(sock, { t: "reset" });
+        const events = this.opts.snapshot?.() ?? [];
+        // One frame: clients drop repeated seqs. oldestSeq - 1 sorts before every replayed entry.
+        if (events.length > 0) {
+          const snapshot: PorcupineUiSnapshot = { type: "porcupine_ui_snapshot", events };
+          this.write(sock, { t: "event", seq: Math.max(0, log.oldestSeq - 1), event: snapshot as unknown as PiEvent });
+        }
+      }
       for (const e of replay.entries) this.write(sock, { t: "event", seq: e.seq, event: e.event });
       this.attached.add(sock);
       return;
