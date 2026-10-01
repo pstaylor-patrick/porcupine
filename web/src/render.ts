@@ -188,5 +188,6 @@ function sentMedia(a: SentAttachment): HTMLElement {
     if (a.kind === "video") media.setAttribute("playsinline", "");
     return el("div", { class: `media-item media-${a.kind}` }, media);
   }
-  return el("a", { href: src, class: "media-file", download: a.name }, a.name);
+  // A new tab, never the app's own view: in an iOS PWA a same-window file preview has no way back.
+  return el("a", { href: src, class: "media-file", target: "_blank", rel: "noopener" }, a.name);
 }

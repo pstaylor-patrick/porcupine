@@ -163,7 +163,7 @@ export async function handleUploads(req: IncomingMessage, res: ServerResponse, c
 }
 
 /** Media types the browser may render inline; anything else downloads. The type is the client's claim, so only these pass. */
-const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|bmp|heic|heif)|video\/(mp4|quicktime|webm|x-matroska|x-m4v)|audio\/[a-z0-9.+-]+)$/;
+const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|bmp|heic|heif)|video\/(mp4|quicktime|webm|x-matroska|x-m4v)|application\/pdf|audio\/[a-z0-9.+-]+)$/;
 
 /** Streams an upload's original file with Range support, which iOS needs to play video. */
 async function serveUpload(req: IncomingMessage, res: ServerResponse, ctx: UploadRouteContext, session: string, id: string): Promise<void> {
