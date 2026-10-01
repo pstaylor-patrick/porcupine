@@ -559,7 +559,8 @@ details > :not(summary) { padding: 0 12px 10px; }
 
 
 /* Session sheet: each section separated by a hairline and room to breathe. */
-#sheet .field + .field, #sheet .field + .sheet-actions { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+#sheet .field + .field, #sheet .sheet-actions + .field { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+#sheet .field + .sheet-actions { margin-top: 12px; }
 
 /* Attachments sent with a user message, shown as the media itself. */
 .msg-media { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px }

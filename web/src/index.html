@@ -87,22 +87,23 @@
             <p id="session-card-cwd" class="model-card-vendor" hidden></p>
           </div>
         </div>
-        <div class="field">
-          <span class="field-label" id="model-label">Model</span>
-          <div id="model-card" class="model-card"><p class="model-card-name">No model selected</p></div>
-          <label class="visually-hidden" for="model-filter">Filter models</label>
-          <input id="model-filter" type="search" placeholder="Filter models" autocomplete="off" />
-          <div id="model-chips" class="filter-chips" role="group" aria-label="Filter by capability"></div>
-          <label class="visually-hidden" for="vendor-jump">Jump to vendor</label>
-          <select id="vendor-jump" class="vendor-jump"><option value="">Jump to vendor</option></select>
-          <p id="model-state" class="model-state field-hint" role="status" aria-live="polite" hidden></p>
-          <div class="model-browser">
-            <section id="model-recent" class="model-recent" aria-labelledby="model-recent-title" hidden>
-              <h3 id="model-recent-title" class="model-section-title">Recently used</h3>
-              <ul id="model-recent-list" class="model-list" role="listbox" aria-labelledby="model-recent-title"></ul>
-            </section>
-            <div id="model-groups" class="model-groups"></div>
+        <div class="sheet-actions">
+          <button id="new-session" type="button" class="primary">New conversation</button>
+          <button id="compact-now" type="button" class="secondary">Compact now</button>
+        <div class="field" id="context-block">
+          <span class="field-label" id="context-label">Context</span>
+          <div id="context-meter" class="ctx-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="context-label"><span class="ctx-fill"></span></div>
+          <p id="context-text" class="field-hint" role="status" aria-live="polite">unknown</p>
+          <p id="session-usage" class="field-hint" role="status">unknown</p>
+          <div class="switch-row">
+            <label for="autocompact-input">Auto-compact</label>
+            <label class="switch"><input id="autocompact-on" type="checkbox" role="switch" checked aria-label="Auto-compact on" /><span aria-hidden="true"></span></label>
           </div>
+          <div class="context-row">
+            <input id="autocompact-input" type="text" inputmode="numeric" autocomplete="off" placeholder="250,000" aria-describedby="autocompact-hint" />
+            <button id="autocompact-save" type="button" class="secondary">Save</button>
+          </div>
+          <p id="autocompact-hint" class="field-hint">Tokens. Leave empty for the default.</p>
         </div>
         <div class="field">
           <label class="field-label" for="thinking-select">Thinking level</label>
@@ -128,24 +129,23 @@
           <select id="merge-mode-select" disabled aria-describedby="merge-mode-status"></select>
           <p id="merge-mode-status" class="field-hint" role="status" aria-live="polite"></p>
         </div>
-        <div class="field" id="context-block">
-          <span class="field-label" id="context-label">Context</span>
-          <div id="context-meter" class="ctx-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="context-label"><span class="ctx-fill"></span></div>
-          <p id="context-text" class="field-hint" role="status" aria-live="polite">unknown</p>
-          <p id="session-usage" class="field-hint" role="status">unknown</p>
-          <div class="switch-row">
-            <label for="autocompact-input">Auto-compact</label>
-            <label class="switch"><input id="autocompact-on" type="checkbox" role="switch" checked aria-label="Auto-compact on" /><span aria-hidden="true"></span></label>
+        <div class="field">
+          <span class="field-label" id="model-label">Model</span>
+          <div id="model-card" class="model-card"><p class="model-card-name">No model selected</p></div>
+          <label class="visually-hidden" for="model-filter">Filter models</label>
+          <input id="model-filter" type="search" placeholder="Filter models" autocomplete="off" />
+          <div id="model-chips" class="filter-chips" role="group" aria-label="Filter by capability"></div>
+          <label class="visually-hidden" for="vendor-jump">Jump to vendor</label>
+          <select id="vendor-jump" class="vendor-jump"><option value="">Jump to vendor</option></select>
+          <p id="model-state" class="model-state field-hint" role="status" aria-live="polite" hidden></p>
+          <div class="model-browser">
+            <section id="model-recent" class="model-recent" aria-labelledby="model-recent-title" hidden>
+              <h3 id="model-recent-title" class="model-section-title">Recently used</h3>
+              <ul id="model-recent-list" class="model-list" role="listbox" aria-labelledby="model-recent-title"></ul>
+            </section>
+            <div id="model-groups" class="model-groups"></div>
           </div>
-          <div class="context-row">
-            <input id="autocompact-input" type="text" inputmode="numeric" autocomplete="off" placeholder="250,000" aria-describedby="autocompact-hint" />
-            <button id="autocompact-save" type="button" class="secondary">Save</button>
-          </div>
-          <p id="autocompact-hint" class="field-hint">Tokens. Leave empty for the default.</p>
         </div>
-        <div class="sheet-actions">
-          <button id="compact-now" type="button" class="secondary">Compact now</button>
-          <button id="new-session" type="button" class="primary">New conversation</button>
         </div>
       </div>
     </section>
