@@ -10,3 +10,5 @@ infra/terraform.tfvars
 *.pem
 *.key
 vapid*.json
+dist.next/
+dist.old/

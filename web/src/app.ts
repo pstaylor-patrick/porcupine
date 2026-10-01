@@ -1310,6 +1310,7 @@ export function start(): void {
       },
     },
   );
+  if (stylesMissing()) return;
   app = new App(conn);
   app.bind();
   pinToVisualViewport();
@@ -1343,4 +1344,21 @@ function recentStorage(): RecentStorage | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * A PWA has no reload control, so a page whose stylesheet failed to load (an
+ * old shell, a deploy mid-flight) reloads itself, at most once a minute.
+ */
+function stylesMissing(): boolean {
+  if (getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() !== "") return false;
+  try {
+    const last = Number(sessionStorage.getItem("porcupine-style-reload") ?? "0");
+    if (Date.now() - last < 60_000) return false;
+    sessionStorage.setItem("porcupine-style-reload", String(Date.now()));
+  } catch {
+    return false;
+  }
+  void reloadLatest();
+  return true;
 }
