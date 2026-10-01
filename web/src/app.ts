@@ -53,6 +53,7 @@ import {
   type RecentStorage,
   type SheetState,
 } from "./models.js";
+import { emptyQueue, itemsFromQueue, parseQueue, renderQueueChips, type PiQueue } from "./queue.js";
 import { Connection, type PiResponse, type ServerFrame, type SessionInfo } from "./ws.js";
 import { disablePush, enablePush, getNotifyPrefs, pushHint, pushState, setNotifyPref, type NotifyPrefs } from "./push.js";
 
@@ -143,6 +144,8 @@ export class App {
   isDesktop: () => boolean = () => typeof window.matchMedia === "function" && window.matchMedia("(min-width: 900px)").matches;
   navigate: (url: string) => void = (url) => location.assign(url);
   readonly dialogs = new DialogQueue();
+  /** pi's queue, mirrored from queue_update (last write wins; the reset snapshot replays it). */
+  queue: PiQueue = emptyQueue();
   readonly statusPanel = new StatusPanel();
   private mergeMode: MergeModePicker | null = null;
   /** The dialog shown in the sheet; hiding the sheet keeps it pending. */
@@ -577,6 +580,10 @@ export class App {
         return;
       case "event":
         if (this.statusPanel.apply(f.event)) this.renderStatusPanel();
+        if (f.event.type === "queue_update") {
+          this.queue = parseQueue(f.event);
+          this.renderQueue();
+        }
         if (this.resetting) this.resetBuffer.push(f.event);
         else {
           applyEvent(this.t, f.event);
@@ -616,6 +623,8 @@ export class App {
       this.syncDialog();
       this.statusPanel.clear();
       this.renderStatusPanel();
+      this.queue = emptyQueue();
+      this.renderQueue();
       this.t = emptyTranscript();
       this.view.clear();
       this.model = null;
@@ -1124,6 +1133,10 @@ export class App {
       d.textContent = detail;
       card.append(d);
     }
+  }
+
+  renderQueue(): void {
+    renderQueueChips($("queue-chips"), itemsFromQueue(this.queue, []));
   }
 
   renderStatusPanel(): void {

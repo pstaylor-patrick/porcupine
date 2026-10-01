@@ -365,7 +365,7 @@ details > :not(summary) { padding: 0 12px 10px; }
 .danger { background: var(--fg); color: var(--bg); }
 .composer .icon-send { width: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
 .composer { flex-wrap: wrap; }
-.composer .command-menu, .composer .status-panel, .composer .attachments, .composer .attach-confirm, .composer .attach-status { flex: 1 0 100%; order: -1; }
+.composer .queue-chips, .composer .command-menu, .composer .status-panel, .composer .attachments, .composer .attach-confirm, .composer .attach-status { flex: 1 0 100%; order: -1; }
 .composer .icon-attach { width: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--bg); color: var(--fg); border: 1px solid var(--line); }
 .composer .icon-attach:disabled, .composer .chip-remove:disabled { opacity: 0.5; }
 .attachments { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
@@ -376,6 +376,13 @@ details > :not(summary) { padding: 0 12px 10px; }
 .chip-name { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; line-height: 1.25; }
 .chip-meta { position: absolute; left: 0; right: 0; bottom: 0; padding: 2px 6px; font-size: 11px; font-variant-numeric: tabular-nums; color: #fff; background: rgb(0 0 0 / 0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .composer .chip-remove { position: absolute; top: 4px; right: 4px; min-height: 24px; width: 24px; height: 24px; padding: 0; border-radius: 50%; background: var(--bg); color: var(--fg); border: 1px solid var(--line); font-size: 12px; font-weight: 400; line-height: 1; }
+.queue-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.queue-chip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 8px 12px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--user); font-size: 14px; }
+.queue-chip[data-pending] { border-style: dashed; }
+.queue-body { flex: 1 1 0; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.3; }
+.queue-marker { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); }
+.queue-files { flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 4px; }
+.queue-file { font-size: 12px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--line); color: var(--muted); }
 .attach-status { font-size: 14px; color: var(--muted); }
 .attach-confirm { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--radius); border: 1px solid var(--fg); background: var(--bg); }
 .attach-confirm-title { margin: 0; overflow-wrap: anywhere; }
