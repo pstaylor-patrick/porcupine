@@ -31,6 +31,12 @@ export function contextPercent(c: ContextInfo | null): string | null {
 }
 
 /** The /autocompact command for the sheet's field; null when the value is invalid. */
+/** The hub's default auto-compact point: 250,000 tokens, or 80% of a smaller window. */
+export function defaultThreshold(contextWindow: number | undefined): number {
+  const tokens = 250_000;
+  return contextWindow && contextWindow <= tokens ? Math.floor(contextWindow * 0.8) : tokens;
+}
+
 export function autocompactCommand(raw: string, off: boolean): string | null {
   if (off) return "/autocompact off";
   const v = raw.replace(/[,\s]/g, "");

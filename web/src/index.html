@@ -118,8 +118,11 @@
           </select>
         </div>
         <div class="field">
-          <label class="toggle"><input id="steer" type="checkbox" /> Steer while running</label>
-          <p class="field-hint">Prompts sent while pi is running interrupt the current turn instead of queuing as a follow-up.</p>
+          <div class="switch-row">
+            <label for="steer">Steer while running</label>
+            <label class="switch"><input id="steer" type="checkbox" role="switch" aria-describedby="steer-hint" /><span aria-hidden="true"></span></label>
+          </div>
+          <p id="steer-hint" class="field-hint">Prompts sent while pi is running interrupt the current turn instead of queuing as a follow-up.</p>
         </div>
         <div class="field" id="merge-mode-block">
           <label class="field-label" for="merge-mode-select">Merge mode (cf)</label>
@@ -130,23 +133,20 @@
           <span class="field-label" id="context-label">Context</span>
           <div id="context-meter" class="ctx-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="context-label"><span class="ctx-fill"></span></div>
           <p id="context-text" class="field-hint" role="status" aria-live="polite">unknown</p>
-          <div class="autocompact-head">
+          <p id="session-usage" class="field-hint" role="status">unknown</p>
+          <div class="switch-row">
             <label for="autocompact-input">Auto-compact</label>
             <label class="switch"><input id="autocompact-on" type="checkbox" role="switch" checked aria-label="Auto-compact on" /><span aria-hidden="true"></span></label>
           </div>
           <div class="context-row">
-            <input id="autocompact-input" type="text" inputmode="numeric" autocomplete="off" placeholder="Default threshold" aria-describedby="autocompact-hint" />
+            <input id="autocompact-input" type="text" inputmode="numeric" autocomplete="off" placeholder="250,000" aria-describedby="autocompact-hint" />
             <button id="autocompact-save" type="button" class="secondary">Save</button>
           </div>
           <p id="autocompact-hint" class="field-hint">Tokens. Leave empty for the default.</p>
-          <button id="compact-now" type="button" class="secondary">Compact now</button>
         </div>
-        <div class="field" id="session-usage-block">
-          <span class="field-label">Usage</span>
-          <p id="session-usage" class="field-hint" role="status">unknown</p>
-        </div>
-        <div class="field">
-          <button id="new-session" type="button" class="secondary">New conversation</button>
+        <div class="sheet-actions">
+          <button id="compact-now" type="button" class="tonal">Compact now</button>
+          <button id="new-session" type="button" class="primary">New conversation</button>
         </div>
       </div>
     </section>

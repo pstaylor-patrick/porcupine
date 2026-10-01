@@ -28,7 +28,7 @@ import {
   type SessionUsage,
   type UsageReport,
 } from "./usage.js";
-import { autocompactCommand, contextPercent, groupDigits, contextText, parseContextUsage, type ContextInfo } from "./context.js";
+import { autocompactCommand, contextPercent, defaultThreshold, groupDigits, contextText, parseContextUsage, type ContextInfo } from "./context.js";
 import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
 import { TranscriptView } from "./render.js";
 import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./transcript.js";
@@ -774,6 +774,7 @@ export class App {
     cost.hidden = !u || !attached || u.cost === 0;
     ($("compact-now") as HTMLButtonElement).disabled = !attached || this.compacting;
     ($("autocompact-save") as HTMLButtonElement).disabled = !attached;
+    ($("autocompact-input") as HTMLInputElement).placeholder = groupDigits(String(defaultThreshold(this.model?.contextWindow)));
   }
 
   async compactNow(): Promise<void> {
