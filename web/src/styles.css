@@ -260,6 +260,7 @@ select {
 .settings-list dt { color: var(--muted); }
 .settings-list dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
 .settings-logout { display: block; width: 100%; max-width: 640px; margin: 0 auto; min-height: 44px; border: 0; border-radius: 10px; font-weight: 600; cursor: pointer; }
+.settings-reload { margin-bottom: 12px; border: 1px solid var(--line); }
 
 .main { grid-area: main; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
 .transcript {

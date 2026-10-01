@@ -270,18 +270,24 @@ export interface Http {
   process(session: string, ids: string[]): Promise<{ results: ProcessResult[] }>;
 }
 
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+const errorText = (v: unknown): string | undefined => (isRecord(v) && typeof v.error === "string" ? v.error : undefined);
+
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), credentials: "same-origin" });
-  const data = (await r.json().catch(() => ({}))) as T & { error?: string };
-  if (!r.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
-  return data;
+  const data: unknown = await r.json().catch(() => null);
+  if (!r.ok || !isRecord(data)) throw new Error(errorText(data) ?? `HTTP ${r.status}`);
+  // The hub owns this contract; tests pin its shape.
+  return data as T;
 }
 
 export const http: Http = {
   async getConfig() {
     const r = await fetch("/api/uploads/config", { credentials: "same-origin" });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return (await r.json()) as UploadsConfig;
+    const data: unknown = await r.json();
+    if (!isRecord(data) || typeof data.confirmUsd !== "number" || typeof data.confirmMinutes !== "number") throw new Error("bad uploads config");
+    return data as unknown as UploadsConfig;
   },
   upload(session, file, onProgress) {
     return new Promise((resolve, reject) => {
@@ -299,8 +305,8 @@ export const http: Http = {
         } catch {
           /* non-JSON body */
         }
-        if (xhr.status === 201 && data) resolve(data as UploadInfo);
-        else reject(new Error(((data as { error?: string } | null)?.error ?? `HTTP ${xhr.status}`) + `: ${file.name}`));
+        if (xhr.status === 201 && isRecord(data) && typeof data.id === "string") resolve(data as unknown as UploadInfo);
+        else reject(new Error((errorText(data) ?? `HTTP ${xhr.status}`) + `: ${file.name}`));
       });
       xhr.addEventListener("error", () => reject(new Error(`upload failed, retry: ${file.name}`)));
       xhr.addEventListener("abort", () => reject(new Error(`upload aborted: ${file.name}`)));
@@ -350,8 +356,9 @@ export async function sendWithAttachments(ctx: SendContext): Promise<string | nu
   const est = await ctx.http.estimate(ctx.session, ids);
   const usd = estimateUsd(est.total, ctx.model);
   if (needsConfirm(est.total, usd, ctx.config)) {
-    const frames = est.uploads.filter((u) => uploads.find((x) => x.id === u.id)?.kind === "video").reduce((n, u) => n + u.imageCount, 0);
-    const pages = est.uploads.filter((u) => uploads.find((x) => x.id === u.id)?.kind === "pdf").reduce((n, u) => n + (u.pages ?? 0), 0);
+    const ofKind = (kind: Kind) => est.uploads.filter((u) => uploads.find((x) => x.id === u.id)?.kind === kind);
+    const frames = ofKind("video").reduce((n, u) => n + u.imageCount, 0);
+    const pages = ofKind("pdf").reduce((n, u) => n + (u.pages ?? 0), 0);
     ctx.status("");
     const ok = await ctx.confirm({ usd, durationSec: est.total.maxDurationSec, frames, pages });
     if (!ok) {

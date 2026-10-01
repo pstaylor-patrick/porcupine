@@ -206,6 +206,7 @@ export class App {
     $("settings-link").addEventListener("click", () => this.openSettings());
     $("settings-back").addEventListener("click", () => this.close("settings"));
     $("logout").addEventListener("click", () => void this.logout());
+    $("reload-app").addEventListener("click", () => void reloadLatest());
     ($("thinking-select") as HTMLSelectElement).addEventListener("change", (e) => {
       void this.setThinking((e.target as HTMLSelectElement).value);
     });
@@ -943,6 +944,18 @@ function pinToVisualViewport(): void {
   document.addEventListener("focusin", sync);
   document.addEventListener("focusout", () => setTimeout(sync, 0));
   sync();
+}
+
+/** Drops the service worker and its cache so the next load fetches the newest build. */
+export async function reloadLatest(): Promise<void> {
+  try {
+    const regs = (await navigator.serviceWorker?.getRegistrations()) ?? [];
+    await Promise.all(regs.map((r) => r.unregister()));
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  } finally {
+    location.reload();
+  }
 }
 
 async function checkAuth(): Promise<void> {
