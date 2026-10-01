@@ -29,6 +29,8 @@ export class UploadError extends Error {
 const SESSION_RE = /^[A-Za-z0-9._-]+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const MAX_NAME = 120;
+/** Names the hub writes beside the original in an upload dir. */
+const RESERVED = new Set(["meta.json", "result.json", "probe.json", "transcript.txt", "text.txt", "whisper-input.wav", "frames", "pages"]);
 
 export function validSessionId(id: string): boolean {
   return SESSION_RE.test(id) && id !== "." && id !== "..";
@@ -43,7 +45,7 @@ export function sanitizeName(raw: string): string {
   const base = raw.split(/[/\\]/).pop() ?? "";
   // eslint-disable-next-line no-control-regex
   const clean = base.replace(/[\u0000-\u001f\u007f]/g, "").replace(/^\.+/, "").trim().slice(0, MAX_NAME);
-  return clean === "" || clean === "meta.json" ? "upload.bin" : clean;
+  return clean === "" || RESERVED.has(clean) ? "upload.bin" : clean;
 }
 
 function byteCap(maxBytes: number): Transform & { count: () => number } {

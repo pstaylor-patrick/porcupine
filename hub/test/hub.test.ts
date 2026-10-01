@@ -228,6 +228,22 @@ describe("uploads", () => {
     const big = await fetch(`${base}/api/uploads?session=${s.meta.id}&name=big.bin`, { method: "POST", headers, body: "x".repeat(2048) });
     expect(big.status).toBe(413);
   });
+  it("estimates and processes a text upload; guards origin, id count and unknown ids", async () => {
+    const s = await startFake();
+    await waitFor(() => hub.registry.list().length === 1);
+    const headers = { Cookie: cookie(), Origin: ORIGIN, "Content-Type": "text/plain" };
+    const up = (await (await fetch(`${base}/api/uploads?session=${s.meta.id}&name=n.txt`, { method: "POST", headers, body: "x".repeat(400) })).json()) as { id: string };
+    const post = (path: string, body: unknown, h: Record<string, string> = headers) =>
+      fetch(`${base}/api/uploads/${path}`, { method: "POST", headers: h, body: JSON.stringify(body) });
+    expect((await post("estimate", { session: s.meta.id, ids: [up.id] }, { Cookie: cookie() })).status).toBe(403);
+    expect((await post("process", { session: s.meta.id, ids: Array(11).fill(up.id) })).status).toBe(400);
+    expect((await post("process", { session: s.meta.id, ids: ["00000000-0000-4000-8000-000000000000"] })).status).toBe(404);
+    const est = await post("estimate", { session: s.meta.id, ids: [up.id] });
+    expect(est.status).toBe(200);
+    expect(((await est.json()) as { total: unknown }).total).toEqual({ imageCount: 0, textTokens: 100, maxDurationSec: 0 });
+    const proc = (await (await post("process", { session: s.meta.id, ids: [up.id] })).json()) as { results: { id: string; kind: string; notes: string[] }[] };
+    expect(proc.results).toMatchObject([{ id: up.id, kind: "text", notes: [] }]);
+  });
   it("config endpoint reflects env overrides", async () => {
     const other = createHub({
       config: config(),
