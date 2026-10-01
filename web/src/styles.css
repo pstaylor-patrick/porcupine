@@ -570,3 +570,13 @@ details > :not(summary) { padding: 0 12px 10px; }
 .msg-media .media-file { display:inline-block; padding:6px 10px; border-radius:8px; background:var(--line); color:inherit; font-size:.85em; word-break:break-all }
 .notify-prefs { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--line); }
 .notify-prefs .switch-row { padding: 8px 0; }
+/* Content scrolling under the status bar fades out instead of showing behind the notch. */
+.settings::before {
+  content: "";
+  position: fixed;
+  z-index: 1;
+  top: 0; left: 0; right: 0;
+  height: calc(env(safe-area-inset-top) + 16px);
+  background: linear-gradient(var(--bg) calc(100% - 16px), transparent);
+  pointer-events: none;
+}
