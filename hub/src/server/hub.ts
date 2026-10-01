@@ -15,6 +15,7 @@ import {
   type Clock,
 } from "./auth.js";
 import type { HubConfig } from "./config.js";
+import { defaultRuby, handleMergeMode, type RubyRunner } from "./merge-mode.js";
 import { Registry } from "./registry.js";
 import { BrowserRelay, MAX_BROWSER_FRAME } from "./relay.js";
 import { MAX_UPLOAD_BYTES, RETENTION_DAYS, uploadConfig, type UploadConfig } from "./uploads/config.js";
@@ -37,6 +38,9 @@ export interface HubOptions {
   usage?: UsageConfig;
   usageFetch?: FetchLike;
   onBudgetWarning?: (w: BudgetWarning) => void;
+  /** cf's bin directory (default ~/.claude/cf/bin, or PORCUPINE_CF_BIN). */
+  cfBin?: string;
+  ruby?: RubyRunner;
 }
 
 export interface Hub {
@@ -180,6 +184,18 @@ export function createHub(opts: HubOptions): Hub {
       return;
     }
     if (await handleUploads(req, res, uploadCtx)) return;
+    if (
+      await handleMergeMode(req, res, {
+        origins: config.origins,
+        authed,
+        sessionExists: (id) => registry.socketPath(id) !== null,
+        runtimeDir: config.runtimeDir,
+        cfBin: opts.cfBin ?? process.env.PORCUPINE_CF_BIN ?? join(homedir(), ".claude", "cf", "bin"),
+        ruby: opts.ruby ?? defaultRuby(process.env.PORCUPINE_RUBY ?? "ruby"),
+        log,
+      })
+    )
+      return;
     if (await handleUsage(req, res, { service: usage, origins: config.origins, authed, log })) return;
     if (path.startsWith("/api/")) {
       res.writeHead(404, { "Content-Type": "text/plain" }).end("not found\n");

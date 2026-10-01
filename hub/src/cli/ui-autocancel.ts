@@ -1,4 +1,5 @@
 import { ASK_TITLE_PREFIX } from "../extension/ask-user-question.js";
+import { HOOK_CONFIRM_PREFIX } from "../extension/claude-hooks/index.js";
 import type { PiEvent, PorcupineNotice, PorcupineUiStateEvent } from "../shared/protocol.js";
 
 /** Dialog methods block pi until an extension_ui_response arrives (rpc-extension-ui.md). */
@@ -33,7 +34,7 @@ export function handleUiRequest(req: PiEvent, opts: { browserAttached: boolean }
   if ((FIRE_AND_FORGET_METHODS as readonly string[]).includes(method)) return {};
   const known = (DIALOG_METHODS as readonly string[]).includes(method);
   const title = typeof req.title === "string" ? req.title : "";
-  if (known && id && (opts.browserAttached || title.startsWith(ASK_TITLE_PREFIX))) {
+  if (known && id && (opts.browserAttached || title.startsWith(ASK_TITLE_PREFIX) || title.startsWith(HOOK_CONFIRM_PREFIX))) {
     return { forward: id, event: req, log: `extension UI ${method} waiting for an answer` };
   }
   const notice: PorcupineNotice = {

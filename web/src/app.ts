@@ -14,6 +14,7 @@ import {
   type Pending,
   type UploadsConfig,
 } from "./attachments.js";
+import { MergeModePicker } from "./merge-mode.js";
 import { StatusPanel } from "./status-panel.js";
 import {
   addBudgetRow,
@@ -138,6 +139,7 @@ export class App {
   navigate: (url: string) => void = (url) => location.assign(url);
   readonly dialogs = new DialogQueue();
   readonly statusPanel = new StatusPanel();
+  private mergeMode: MergeModePicker | null = null;
   /** The dialog shown in the sheet; hiding the sheet keeps it pending. */
   private shownDialog: Dialog | null = null;
   private readonly returnFocus = new Map<Overlay, HTMLElement | null>();
@@ -334,6 +336,8 @@ export class App {
     this.renderHeader();
     void this.loadModels();
     void this.refreshContext();
+    this.mergeMode ??= new MergeModePicker($("merge-mode-select") as HTMLSelectElement, $("merge-mode-status"));
+    void this.mergeMode.load(this.conn.sessionId);
   }
 
   openSettings(): void {

@@ -44,3 +44,8 @@ export function ensureRuntimeDir(dir: string): string {
 export function sessionPaths(runtimeDir: string, id: string): { sock: string; meta: string } {
   return { sock: join(runtimeDir, `${id}.sock`), meta: join(runtimeDir, `${id}.json`) };
 }
+
+/** File where a session's claude-hooks extension records the cf session id it uses. */
+export function cfIdPath(runtimeDir: string, id: string): string {
+  return join(runtimeDir, `${id}.cf-session`);
+}

@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { rmSync, writeFileSync, chmodSync, existsSync, readFileSync } from "node:fs";
 import type { PiCommand, PiEvent, PiResponse, PorcupineUiResolved, SessionMeta } from "../shared/protocol.js";
-import { ensureRuntimeDir, sessionPaths } from "../shared/paths.js";
+import { cfIdPath, ensureRuntimeDir, sessionPaths } from "../shared/paths.js";
 import { EventLog, type EventLogLimits } from "./event-log.js";
 import type { LogFn } from "./log.js";
 import { PiProcess } from "./pi-process.js";
@@ -51,6 +51,9 @@ export async function startSession(o: SessionOptions): Promise<Session> {
   const id = `${slugify(o.name)}-${pid}`;
   ensureRuntimeDir(o.runtimeDir);
   const paths = sessionPaths(o.runtimeDir, id);
+  // The claude-hooks extension reads these: the registry id as its default cf
+  // session id, and where to record the id it settled on for the merge-mode picker.
+  const piEnv: NodeJS.ProcessEnv = { ...o.childEnv, PORCUPINE_SESSION_ID: id, PORCUPINE_CF_ID_FILE: cfIdPath(o.runtimeDir, id) };
   const events = new EventLog(o.limits);
   const version = await piVersion(o.piBin, o.childEnv);
   if (o.expectedPiVersion && version !== o.expectedPiVersion) {
@@ -91,13 +94,14 @@ export async function startSession(o: SessionOptions): Promise<Session> {
     cleaned = true;
     rmSync(paths.sock, { force: true });
     rmSync(paths.meta, { force: true });
+    rmSync(cfIdPath(o.runtimeDir, id), { force: true });
   };
 
   const pi = new PiProcess({
     bin: o.piBin,
     args: o.piArgs,
     cwd: o.cwd,
-    env: o.childEnv,
+    env: piEnv,
     onEvent: (e) => {
       if (e.type === "agent_start") o.log("run started");
       if (e.type === "agent_settled") o.log("run settled");
