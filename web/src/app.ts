@@ -53,7 +53,7 @@ import {
   type RecentStorage,
   type SheetState,
 } from "./models.js";
-import { emptyQueue, itemsFromQueue, parseQueue, renderQueueChips, type PiQueue } from "./queue.js";
+import { emptyQueue, itemsFromQueue, parseQueue, renderQueueChips, restoreText, type PiQueue } from "./queue.js";
 import { Connection, type PiResponse, type ServerFrame, type SessionInfo } from "./ws.js";
 import { disablePush, enablePush, getNotifyPrefs, pushHint, pushState, setNotifyPref, type NotifyPrefs } from "./push.js";
 
@@ -748,6 +748,7 @@ export class App {
     renderChips($("attachments"), this.pending, (i) => this.removeAttachment(i), this.sending);
     ($("attach") as HTMLButtonElement).disabled = this.sending || this.conn.sessionId === null;
     ($("send") as HTMLButtonElement).disabled = this.sending;
+    this.queueRender();
   }
 
   private attachStatus(text: string): void {
@@ -800,8 +801,7 @@ export class App {
       if (full === null || this.conn.sessionId !== sid) return;
       text = full;
     }
-    const steer = ($("steer") as HTMLInputElement).checked;
-    const cmd = buildPrompt(text, this.t.isStreaming, steer ? "steer" : "followUp");
+    const cmd = buildPrompt(text, this.t.isStreaming, "followUp");
     const typed = this.input.value;
     this.input.value = "";
     this.autogrow();
@@ -901,8 +901,16 @@ export class App {
 
   async abort(): Promise<void> {
     if (!this.conn.sessionId) return;
+    // pi's abort leaves the queue intact; clear it first so stale items do not ride along with the next prompt.
+    const cleared = await this.conn.command({ type: "clear_queue" });
     const r = await this.conn.command({ type: "abort" });
     if (!r.success) this.notice("error", `abort failed: ${r.error ?? "unknown error"}`);
+    if (cleared.success) {
+      this.input.value = restoreText(parseQueue((cleared.data ?? {}) as Record<string, unknown>), this.input.value);
+      this.autogrow();
+      this.queueRender();
+      this.input.focus();
+    }
   }
 
   async setThinking(level: string): Promise<void> {
@@ -1239,8 +1247,10 @@ export class App {
     const nearBottom = this.main.scrollHeight - this.main.scrollTop - this.main.clientHeight < 120;
     this.view.render(this.t);
     const streaming = this.t.isStreaming;
-    $("abort").hidden = !streaming;
-    $("send").hidden = streaming && !this.input.value.trim();
+    // While streaming, Stop shows only for an empty composer; anything typed or staged turns it into Send.
+    const showStop = streaming && !this.input.value.trim() && this.pending.length === 0;
+    $("abort").hidden = !showStop;
+    $("send").hidden = showStop;
     $("run-status").textContent = streaming ? "Running" : "Idle";
     document.body.classList.toggle("is-streaming", streaming);
     this.syncEmpty();

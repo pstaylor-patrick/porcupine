@@ -128,7 +128,7 @@ describe("app", () => {
     conn.sessionId = "s1";
     const input = document.getElementById("input") as HTMLTextAreaElement;
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
-    await vi.waitFor(() => expect(sent).toEqual([{ type: "abort" }]));
+    await vi.waitFor(() => expect(sent).toEqual([{ type: "clear_queue" }, { type: "abort" }]));
   });
 
   const sessions = [
@@ -280,7 +280,7 @@ describe("app", () => {
     expect(sent).toEqual([]);
 
     input.dispatchEvent(esc());
-    await vi.waitFor(() => expect(sent).toEqual([{ type: "abort" }]));
+    await vi.waitFor(() => expect(sent).toEqual([{ type: "clear_queue" }, { type: "abort" }]));
   });
 
   it("sends set_model and set_thinking_level with the right fields from the sheet", async () => {
@@ -503,14 +503,44 @@ describe("app", () => {
     expect(document.body.classList.contains("is-streaming")).toBe(false);
   });
 
-  it("uses the steer toggle from the sheet for prompts sent while streaming", async () => {
+  it("swaps Stop for Send while streaming once the composer has text, never showing both", () => {
+    const { app } = setup({});
+    const input = document.getElementById("input") as HTMLTextAreaElement;
+    const stop = document.getElementById("abort") as HTMLElement;
+    const send = document.getElementById("send") as HTMLElement;
+    app.t.isStreaming = false;
+    app.render();
+    expect([stop.hidden, send.hidden]).toEqual([true, false]);
+    app.t.isStreaming = true;
+    input.value = "";
+    app.render();
+    expect([stop.hidden, send.hidden]).toEqual([false, true]);
+    input.value = "next";
+    app.render();
+    expect([stop.hidden, send.hidden]).toEqual([true, false]);
+    input.value = "";
+    app.pending = [{ file: new File(["x"], "a.txt"), kind: "file" } as (typeof app.pending)[number]];
+    app.render();
+    expect([stop.hidden, send.hidden]).toEqual([true, false]);
+  });
+
+  it("queues a submit while streaming as a followUp prompt", async () => {
     const { app, conn, sent } = setup({});
     conn.sessionId = "s1";
     app.t.isStreaming = true;
-    (byId("steer") as HTMLInputElement).checked = true;
-    (byId("input") as HTMLTextAreaElement).value = "change course";
+    (document.getElementById("input") as HTMLTextAreaElement).value = "later";
     await app.send();
-    expect(sent[0]).toEqual({ type: "prompt", message: "change course", images: [], streamingBehavior: "steer" });
+    expect(sent).toContainEqual({ type: "prompt", message: "later", images: [], streamingBehavior: "followUp" });
+    expect(document.getElementById("steer")).toBeNull();
+  });
+
+  it("Stop clears the queue, aborts, and restores queued text ahead of the draft", async () => {
+    const { app, conn, sent } = setup({ clear_queue: { success: true, data: { steering: ["s1"], followUp: ["f1", "f2"] } } });
+    conn.sessionId = "s1";
+    const input = document.getElementById("input") as HTMLTextAreaElement;
+    input.value = "draft";
+    await app.abort();
+    expect(sent.map((c) => c.type)).toEqual(["clear_queue", "abort"]);
+    expect(input.value).toBe("s1\n\nf1\n\nf2\n\ndraft");
   });
 });
-
