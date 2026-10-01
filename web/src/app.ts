@@ -351,11 +351,31 @@ export class App {
     $("dialog-reopen").addEventListener("click", () => this.showDialog());
     $("settings-link").addEventListener("click", () => this.openSettings());
     // Settings is reached from the sessions drawer; its menu button goes back there.
+    // On desktop it is a plain close button and leaves the docked sidebar as it was.
     $("settings-back").addEventListener("click", () => {
       this.close("settings");
-      if (this.isDesktop()) $("app").classList.remove("sidebar-collapsed");
-      else if (!this.overlays.includes("sidebar")) this.toggleSidebar();
+      if (!this.isDesktop() && !this.overlays.includes("sidebar"))
+        this.toggleSidebar();
     });
+    const tabs = this.settingsTabs();
+    for (const tab of tabs) {
+      tab.addEventListener("click", () => this.selectSettingsTab(tab.id));
+      tab.addEventListener("keydown", (e) => {
+        const step =
+          e.key === "ArrowDown" || e.key === "ArrowRight"
+            ? 1
+            : e.key === "ArrowUp" || e.key === "ArrowLeft"
+              ? -1
+              : 0;
+        if (!step) return;
+        e.preventDefault();
+        const i = tabs.indexOf(tab);
+        const next = tabs[(i + step + tabs.length) % tabs.length];
+        if (!next) return;
+        this.selectSettingsTab(next.id);
+        next.focus();
+      });
+    }
     $("logout").addEventListener("click", () => void this.logout());
     $("reload-app").addEventListener("click", () => void reloadLatest());
     $("push-toggle").addEventListener(
@@ -509,7 +529,42 @@ export class App {
     if (this.overlays.includes("sidebar")) this.close("sidebar");
     this.renderSettings();
     void this.loadUsage(true);
+    this.syncSettingsMode();
     this.open("settings", "settings-back");
+  }
+
+  private settingsTab = "settings-tab-general";
+
+  private settingsTabs(): HTMLElement[] {
+    return [
+      ...document.querySelectorAll<HTMLElement>('#settings-tabs [role="tab"]'),
+    ];
+  }
+
+  selectSettingsTab(id: string): void {
+    this.settingsTab = id;
+    this.syncSettingsMode();
+  }
+
+  /** Desktop: one tab panel at a time and an X close button. Phones: every section and the Sessions menu button. */
+  syncSettingsMode(): void {
+    const desktop = this.isDesktop();
+    for (const tab of this.settingsTabs()) {
+      const selected = tab.id === this.settingsTab;
+      tab.setAttribute("aria-selected", String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      const panel = document.getElementById(
+        tab.getAttribute("aria-controls") ?? "",
+      );
+      if (panel) panel.hidden = desktop && !selected;
+    }
+    const back = $("settings-back");
+    back.setAttribute("aria-label", desktop ? "Close settings" : "Sessions");
+    for (const svg of back.querySelectorAll<SVGElement>("svg[data-icon]")) {
+      const show = svg.dataset.icon === (desktop ? "close" : "menu");
+      if (show) svg.removeAttribute("hidden");
+      else svg.setAttribute("hidden", "");
+    }
   }
 
   private syncOverlays(): void {
@@ -533,7 +588,12 @@ export class App {
     $("sheet").dataset.open = String(sheetOpen);
     $("session-title").setAttribute("aria-expanded", String(sheetOpen));
     $("settings").hidden = !settingsOpen;
-    $("scrim").hidden = !(sheetOpen || sidebarOpen || dialogOpen);
+    $("scrim").hidden = !(
+      sheetOpen ||
+      sidebarOpen ||
+      dialogOpen ||
+      (desktop && settingsOpen)
+    );
     $("scrim").dataset.for = sheetOpen || dialogOpen ? "sheet" : "sidebar";
   }
 
@@ -1778,7 +1838,9 @@ function pinToVisualViewport(): void {
     }
     if (window.scrollY !== 0) window.scrollTo(0, 0);
     // Settings scroll internally; keep the focused field above the keyboard.
-    if (typing && el.closest(".settings, .sheet"))
+    // Desktop modals have no on-screen keyboard to dodge.
+    const desktop = window.matchMedia?.("(min-width: 900px)").matches ?? false;
+    if (typing && !desktop && el.closest(".settings, .sheet"))
       el.scrollIntoView({ block: "center" });
   };
   vv.addEventListener("resize", sync);

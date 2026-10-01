@@ -1144,3 +1144,71 @@ describe("desktop modals", () => {
     expect(byId("dialog").dataset.open).toBe("false");
   });
 });
+
+describe("settings modal", () => {
+  function setup(desktop: boolean) {
+    loadShell();
+    const conn = new Connection(
+      { url: "ws://x/ws", storage: null },
+      { onFrame: () => undefined, onStatus: () => undefined },
+    );
+    vi.spyOn(conn, "command").mockResolvedValue({ success: true });
+    const app = new App(conn);
+    app.isDesktop = () => desktop;
+    app.bind();
+    return { app };
+  }
+  const byId = (id: string) => document.getElementById(id) as HTMLElement;
+  const panels = ["general", "notifications", "usage", "budgets"];
+
+  it("desktop: opens on General, tabs switch sections, close leaves the sidebar alone", () => {
+    const { app } = setup(true);
+    byId("app").classList.add("sidebar-collapsed");
+    byId("settings-link").click();
+    expect(app.overlays).toEqual(["settings"]);
+    expect(byId("scrim").hidden).toBe(false);
+    expect(byId("settings-tab-general").getAttribute("aria-selected")).toBe(
+      "true",
+    );
+    expect(panels.filter((p) => !byId(`settings-${p}`).hidden)).toEqual([
+      "general",
+    ]);
+    expect(
+      byId("settings-general").querySelector(".theme-toggle"),
+    ).not.toBeNull();
+    byId("settings-tab-budgets").click();
+    expect(panels.filter((p) => !byId(`settings-${p}`).hidden)).toEqual([
+      "budgets",
+    ]);
+    expect(byId("settings-tab-budgets").getAttribute("aria-selected")).toBe(
+      "true",
+    );
+    byId("settings-tab-budgets").dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }),
+    );
+    expect(panels.filter((p) => !byId(`settings-${p}`).hidden)).toEqual([
+      "usage",
+    ]);
+    expect(document.activeElement?.id).toBe("settings-tab-usage");
+    expect(byId("settings-back").getAttribute("aria-label")).toBe(
+      "Close settings",
+    );
+    byId("settings-back").click();
+    expect(app.overlays).toEqual([]);
+    expect(byId("settings").hidden).toBe(true);
+    expect(byId("app").classList.contains("sidebar-collapsed")).toBe(true);
+  });
+
+  it("mobile: every section shows and the back button is Sessions", () => {
+    const { app } = setup(false);
+    byId("settings-link").click();
+    expect(app.overlays).toEqual(["settings"]);
+    expect(panels.every((p) => !byId(`settings-${p}`).hidden)).toBe(true);
+    expect(byId("settings-back").getAttribute("aria-label")).toBe("Sessions");
+    expect(
+      byId("settings-back")
+        .querySelector('[data-icon="menu"]')
+        ?.hasAttribute("hidden"),
+    ).toBe(false);
+  });
+});

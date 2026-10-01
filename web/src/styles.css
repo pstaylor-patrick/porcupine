@@ -272,6 +272,8 @@ select {
 .settings-list dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
 .settings-logout { display: block; width: 100%; max-width: 640px; margin: 0 auto; min-height: 44px; border: 0; border-radius: 10px; font-weight: 600; cursor: pointer; }
 .settings-reload { margin-bottom: 12px; }
+/* Section tabs and the in-panel theme row exist only in the desktop modal. */
+.settings-tabs, .settings-theme-row { display: none; }
 
 .main { grid-area: main; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
 .transcript {
@@ -429,6 +431,35 @@ details > :not(summary) { padding: 0 12px 10px; }
     transition: transform 160ms ease, opacity 160ms ease;
   }
   .model-browser { max-height: 50dvh; }
+  /* Global settings: a centered modal with section tabs; the docked sidebar stays visible behind the scrim. */
+  .settings {
+    inset: auto;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(860px, 92vw);
+    height: auto;
+    max-height: 90dvh;
+    padding: 8px 24px 24px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 24px 64px rgb(0 0 0 / 0.28);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
+  .settings[hidden] { display: none; }
+  .settings::before { display: none; }
+  .settings > * { grid-column: 1 / -1; }
+  .settings-head { max-width: none; width: 100%; }
+  .settings-head .theme-toggle { display: none; }
+  .settings-tabs { display: flex; gap: 4px; margin: 8px 0 4px; border-bottom: 1px solid var(--line); }
+  .settings-tabs [role="tab"] { min-height: 40px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; }
+  .settings-tabs [role="tab"][aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+  .settings-tabs [role="tab"]:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .settings-panel[hidden] { display: none; }
+  .settings-panel, .settings-panel > .settings-list { max-width: none; width: 100%; }
+  .settings-theme-row { display: flex; justify-content: space-between; align-items: center; margin: 0 0 16px; padding: 4px 4px 4px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+  .settings-logout { max-width: none; }
   .composer { padding-left: max(var(--gutter), calc((100% - 900px) / 2 + var(--gutter))); padding-right: max(var(--gutter), calc((100% - 900px) / 2 + var(--gutter))); }
 }
 
@@ -446,6 +477,13 @@ details > :not(summary) { padding: 0 12px 10px; }
   #sheet .sheet-models { display: flex; flex-direction: column; min-height: 0; margin: 0; padding: 0 0 0 28px; border-top: 0; border-left: 1px solid var(--line); }
   #sheet .sheet-models > .field { flex: 1 1 auto; min-height: 0; }
   #sheet .model-browser { flex: 1 1 auto; min-height: 0; max-height: none; }
+  /* Settings tabs become a left rail. */
+  .settings { grid-template-columns: 180px minmax(0, 1fr); column-gap: 24px; }
+  .settings > * { grid-column: 2; }
+  .settings > .settings-head { grid-column: 1 / -1; }
+  .settings-tabs { grid-column: 1; grid-row: 2 / span 8; align-self: start; position: sticky; top: 0; flex-direction: column; margin: 16px 0 0; border-bottom: 0; }
+  .settings-tabs [role="tab"] { text-align: left; border-bottom: 0; border-radius: 10px; }
+  .settings-tabs [role="tab"][aria-selected="true"] { background: var(--user); }
 }
 
 /* Extension dialogs and ask_user_question. */
