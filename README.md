@@ -49,6 +49,18 @@ ruby install.rb
 the pre-commit hook and reports missing settings. Rerun it after each pull;
 `--no-pi` skips the pi install.
 
+Audio and video attachments are transcribed locally by whisper.cpp; nothing is
+sent to a cloud speech service. `ruby install.rb --whisper` clones whisper.cpp
+at a pinned tag into `~/.local/src/whisper.cpp`, builds `whisper-cli` into
+`~/.local/bin` (it needs git, cmake and a C++ compiler; apt: `build-essential
+cmake`, or cmake is installed per user with pipx) and downloads the ggml base
+model to `~/.local/share/porcupine/whisper/ggml-base.bin`. Without the flag the
+installer offers the step when whisper is missing, and every run ends with a
+`whisper:` status line. `PORCUPINE_WHISPER_MODEL` picks another model, either a
+name such as `small` (resolved to `ggml-small.bin` in that directory) or an
+absolute path to a `.bin`; `PORCUPINE_WHISPER_BIN` points at a different
+`whisper-cli` binary.
+
 ## Configuration
 
 Settings come from the process environment or the env file
