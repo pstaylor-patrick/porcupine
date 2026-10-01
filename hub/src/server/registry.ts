@@ -204,17 +204,23 @@ export class Registry {
       needsInput: false,
     };
     let ended = false;
+    // Events at or below the welcome's head are the CLI's replayed history (every hub
+    // start or reconnect sends since=null), not live activity: they update state but
+    // must never notify, or an answered question pushes again after a hub restart.
+    let replayHead = Number.POSITIVE_INFINITY;
     const conn = await CliConnection.open(sock, null, {
       onFrame: (f) => {
         if (f.t === "welcome") {
           entry.meta = f.meta;
+          replayHead = f.headSeq;
         } else if (f.t === "event") {
           const viewed = this.opts.isViewed?.(id) ?? false;
           const r = applyActivity(entry, f.event, viewed);
           if (r.changed) this.opts.onChange?.();
+          const live = f.seq > replayHead;
           try {
-            if (r.settled) this.opts.onSettled?.(entry.meta, viewed);
-            if (r.needsInput !== null) this.opts.onNeedsInput?.(entry.meta, r.needsInput, viewed);
+            if (live && r.settled) this.opts.onSettled?.(entry.meta, viewed);
+            if (live && r.needsInput !== null) this.opts.onNeedsInput?.(entry.meta, r.needsInput, viewed);
           } catch (e) {
             this.opts.log?.(`activity hook failed: ${(e as Error).message}`);
           }
