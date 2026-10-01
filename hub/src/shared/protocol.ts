@@ -7,6 +7,7 @@ export const ALLOWED_PI_COMMANDS = [
   "steer",
   "follow_up",
   "abort",
+  "clear_queue",
   "get_state",
   "get_messages",
   "get_entries",

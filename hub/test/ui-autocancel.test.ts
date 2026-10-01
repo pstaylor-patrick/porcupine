@@ -67,4 +67,13 @@ describe("UiStateStore", () => {
       { type: "porcupine_ui_title", title: "T" },
     ]);
   });
+
+  it("keeps the last queue_update so the queue survives a reset", () => {
+    const s = new UiStateStore();
+    s.apply({ type: "queue_update", steering: ["a"], followUp: ["b"] });
+    s.apply({ type: "queue_update", steering: [], followUp: ["b", "c"] });
+    expect(s.snapshot()).toEqual([{ type: "queue_update", steering: [], followUp: ["b", "c"] }]);
+    s.apply({ type: "queue_update", steering: [], followUp: [] });
+    expect(s.snapshot()).toEqual([{ type: "queue_update", steering: [], followUp: [] }]);
+  });
 });

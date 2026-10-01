@@ -15,6 +15,9 @@ describe("ALLOWED_PI_COMMANDS", () => {
       "abort_retry",
       "prompt",
       "compact",
+      "steer",
+      "follow_up",
+      "clear_queue",
     ]) {
       expect(isAllowedCommand(c), c).toBe(true);
     }
