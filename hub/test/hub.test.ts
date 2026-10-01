@@ -393,4 +393,12 @@ describe("push routes", () => {
     const off = await fetch(`${base}/api/push/unsubscribe`, { method: "POST", headers, body: JSON.stringify({ endpoint: subscription.endpoint }) });
     expect(off.status).toBe(200);
   });
+  it("reads and saves notification preferences", async () => {
+    const get = async (): Promise<unknown> => (await fetch(`${base}/api/push/prefs`, { headers: { Cookie: cookie() } })).json();
+    expect(await get()).toEqual({ input: true, finished: false, budget: true });
+    const headers = { Cookie: cookie(), Origin: ORIGIN, "Content-Type": "application/json" };
+    const res = await fetch(`${base}/api/push/prefs`, { method: "POST", headers, body: JSON.stringify({ finished: true, junk: 1 }) });
+    expect(await res.json()).toEqual({ input: true, finished: true, budget: true });
+    expect(await get()).toEqual({ input: true, finished: true, budget: true });
+  });
 });

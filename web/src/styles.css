@@ -566,3 +566,5 @@ details > :not(summary) { padding: 0 12px 10px; }
 .msg-media img, .msg-media video { display:block; max-width:min(280px, 100%); max-height:320px; object-fit:contain }
 .msg-media .media-audio audio { display:block; max-width:100% }
 .msg-media .media-file { display:inline-block; padding:6px 10px; border-radius:8px; background:var(--line); color:inherit; font-size:.85em; word-break:break-all }
+.notify-prefs { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--line); }
+.notify-prefs .switch-row { padding: 8px 0; }

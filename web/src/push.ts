@@ -24,7 +24,7 @@ export function pushHint(s: PushState): string {
     case "denied":
       return "Notifications are blocked for this site. Allow them in the browser's site settings.";
     case "on":
-      return "On: you get a notification when an agent finishes or needs input in a session you are not looking at, and for budget warnings.";
+      return "Only for sessions you are not looking at. At most one per session every 2 minutes.";
     case "off":
       return "Off.";
   }
@@ -66,4 +66,20 @@ export async function disablePush(): Promise<void> {
   if (!sub) return;
   await post("/api/push/unsubscribe", { endpoint: sub.endpoint }).catch(() => undefined);
   await sub.unsubscribe();
+}
+
+export interface NotifyPrefs {
+  input: boolean;
+  finished: boolean;
+  budget: boolean;
+}
+
+export async function getNotifyPrefs(): Promise<NotifyPrefs> {
+  const res = await fetch("/api/push/prefs", { credentials: "same-origin" });
+  if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
+  return (await res.json()) as NotifyPrefs;
+}
+
+export async function setNotifyPref(key: keyof NotifyPrefs, on: boolean): Promise<void> {
+  await post("/api/push/prefs", { [key]: on });
 }

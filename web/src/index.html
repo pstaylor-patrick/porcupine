@@ -172,6 +172,20 @@
           <label class="switch"><input id="push-toggle" type="checkbox" role="switch" /><span aria-hidden="true"></span></label>
         </div>
         <p id="push-status" class="field-hint" role="status" aria-live="polite"></p>
+        <div id="notify-prefs" class="notify-prefs" hidden>
+          <div class="switch-row">
+            <label for="notify-input">Needs input</label>
+            <label class="switch"><input id="notify-input" data-pref="input" type="checkbox" role="switch" /><span aria-hidden="true"></span></label>
+          </div>
+          <div class="switch-row">
+            <label for="notify-finished">Agent finished</label>
+            <label class="switch"><input id="notify-finished" data-pref="finished" type="checkbox" role="switch" /><span aria-hidden="true"></span></label>
+          </div>
+          <div class="switch-row">
+            <label for="notify-budget">Budget warnings</label>
+            <label class="switch"><input id="notify-budget" data-pref="budget" type="checkbox" role="switch" /><span aria-hidden="true"></span></label>
+          </div>
+        </div>
       </section>
       <section class="settings-section" aria-labelledby="usage-title">
         <h3 id="usage-title" class="settings-subtitle">Usage</h3>

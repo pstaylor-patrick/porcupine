@@ -54,7 +54,7 @@ import {
   type SheetState,
 } from "./models.js";
 import { Connection, type PiResponse, type ServerFrame, type SessionInfo } from "./ws.js";
-import { disablePush, enablePush, pushHint, pushState } from "./push.js";
+import { disablePush, enablePush, getNotifyPrefs, pushHint, pushState, setNotifyPref, type NotifyPrefs } from "./push.js";
 
 export function appTitle(): string {
   return "Porcupine";
@@ -261,6 +261,15 @@ export class App {
     $("logout").addEventListener("click", () => void this.logout());
     $("reload-app").addEventListener("click", () => void reloadLatest());
     $("push-toggle").addEventListener("change", (e) => void this.togglePush((e.target as HTMLInputElement).checked));
+    for (const input of $("notify-prefs").querySelectorAll<HTMLInputElement>("input[data-pref]")) {
+      input.addEventListener("change", () => {
+        const key = input.dataset.pref as keyof NotifyPrefs;
+        setNotifyPref(key, input.checked).catch((e: unknown) => {
+          input.checked = !input.checked;
+          $("push-status").textContent = `Notifications: ${e instanceof Error ? e.message : String(e)}`;
+        });
+      });
+    }
     $("budget-add").addEventListener("click", () => {
       const row = addBudgetRow($("budget-rows"));
       if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -456,6 +465,15 @@ export class App {
     toggle.disabled = st === "unsupported" || st === "denied";
     toggle.checked = st === "on";
     $("push-status").textContent = pushHint(st);
+    const prefs = $("notify-prefs");
+    prefs.hidden = st !== "on";
+    if (st !== "on") return;
+    try {
+      const p = await getNotifyPrefs();
+      for (const input of prefs.querySelectorAll<HTMLInputElement>("input[data-pref]")) input.checked = p[input.dataset.pref as keyof NotifyPrefs];
+    } catch {
+      prefs.hidden = true;
+    }
   }
 
   async togglePush(on: boolean): Promise<void> {

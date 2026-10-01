@@ -27,6 +27,7 @@ import { handleUsage } from "./usage/routes.js";
 import { UsageService, type BudgetWarning } from "./usage/service.js";
 import type { FetchLike } from "./usage/openrouter.js";
 import { Notifier } from "./push/notifier.js";
+import { PrefsStore } from "./push/prefs.js";
 import { handlePush } from "./push/routes.js";
 import { PushSender, type PushFetch } from "./push/send.js";
 import { SubscriptionStore } from "./push/store.js";
@@ -109,7 +110,8 @@ export function createHub(opts: HubOptions): Hub {
     now,
     log,
   });
-  const notifier = new Notifier((m) => pushSender.send(m));
+  const pushPrefs = new PrefsStore(join(usageCfg.dir, "push-prefs.json"));
+  const notifier = new Notifier((m) => pushSender.send(m), { prefs: () => pushPrefs.get() });
   const usage = new UsageService({
     config: usageCfg,
     now,
@@ -224,7 +226,7 @@ export function createHub(opts: HubOptions): Hub {
       })
     )
       return;
-    if (await handlePush(req, res, { sender: pushSender, store: pushStore, origins: config.origins, authed, log })) return;
+    if (await handlePush(req, res, { sender: pushSender, store: pushStore, prefs: pushPrefs, origins: config.origins, authed, log })) return;
     if (await handleUsage(req, res, { service: usage, origins: config.origins, authed, log })) return;
     if (path.startsWith("/api/")) {
       res.writeHead(404, { "Content-Type": "text/plain" }).end("not found\n");

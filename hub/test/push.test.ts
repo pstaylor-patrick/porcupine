@@ -95,16 +95,39 @@ describe("subscriptions", () => {
 describe("triggers", () => {
   it("suppresses session pushes while viewed; budget always sends", () => {
     const sent: PushMessage[] = [];
-    const n = new Notifier((m) => void sent.push(m));
-    const s = { id: "s1", name: "work" };
-    n.settled(s, true);
-    n.needsInput(s, "Pick one", true);
+    let prefs = { input: true, finished: true, budget: true };
+    const n = new Notifier((m) => void sent.push(m), { prefs: () => prefs });
+    n.settled({ id: "s1", name: "work" }, true);
+    n.needsInput({ id: "s2", name: "work" }, "Pick one", true);
     expect(sent).toHaveLength(0);
-    n.settled(s, false);
-    n.needsInput(s, "Pick one", false);
+    n.settled({ id: "s1", name: "work" }, false);
+    n.needsInput({ id: "s2", name: "work" }, "Pick one", false);
     n.budget("anthropic at 80%");
     expect(sent.map((m) => m.body)).toEqual(["Agent finished", "Needs input: Pick one", "anthropic at 80%"]);
     expect(sent[0]?.session).toBe("s1");
+    prefs = { input: false, finished: false, budget: false };
+    n.settled({ id: "s3", name: "x" }, false);
+    n.needsInput({ id: "s4", name: "x" }, "Q", false);
+    n.budget("again");
+    expect(sent).toHaveLength(3);
+  });
+
+  it("sends one push per session per cooldown and collapses the rest", () => {
+    const sent: PushMessage[] = [];
+    let t = 0;
+    const timers: (() => void)[] = [];
+    const n = new Notifier((m) => void sent.push(m), { cooldownMs: 1000, now: () => t, setTimer: (fn) => timers.push(fn) });
+    const s = { id: "s1", name: "work" };
+    n.needsInput(s, "Q1", false);
+    for (let i = 0; i < 11; i++) n.needsInput(s, "Q1", false);
+    n.needsInput(s, "Q2", false);
+    n.settled(s, false);
+    n.needsInput({ id: "s2", name: "other" }, "Q", false);
+    expect(sent.map((m) => m.body)).toEqual(["Needs input: Q1", "Needs input: Q"]);
+    expect(timers).toHaveLength(1);
+    t = 1000;
+    timers[0]?.();
+    expect(sent.map((m) => m.body)).toEqual(["Needs input: Q1", "Needs input: Q", "Needs input: Q2"]);
   });
 
   it("tracks running, unread and needs-input", () => {
