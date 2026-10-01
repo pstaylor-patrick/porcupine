@@ -155,6 +155,13 @@ async function askInTerminal(questions: AskQuestion[], ctx: ExtensionContext, si
   return answers;
 }
 
+/** Subagents run headless (-p): nobody can answer, so the child decides itself. */
+export const SUBAGENT_ANSWER = "ask_user_question is not available in a subagent: no one can answer. Decide yourself, state the assumption you made, and continue.";
+
+export function subagentResult(questions: AskQuestion[]): ToolResult {
+  return { content: [{ type: "text", text: SUBAGENT_ANSWER }], details: { questions, answers: null } };
+}
+
 export default function askUserQuestion(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "ask_user_question",
@@ -164,6 +171,7 @@ export default function askUserQuestion(pi: ExtensionAPI): void {
     executionMode: "sequential",
     exposure: "model-only",
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      if (process.env.PORCUPINE_SUBAGENT === "1") return subagentResult(params.questions);
       if (ctx.mode !== "rpc") return formatResult(params.questions, await askInTerminal(params.questions, ctx, signal));
       const raw = await ctx.ui.input(encodeAskTitle(params), undefined, { signal });
       return formatResult(params.questions, raw === undefined ? null : parseAnswers(raw, params.questions));

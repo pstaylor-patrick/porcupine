@@ -21,6 +21,7 @@ import { BrowserRelay, MAX_BROWSER_FRAME } from "./relay.js";
 import { MAX_UPLOAD_BYTES, RETENTION_DAYS, uploadConfig, type UploadConfig } from "./uploads/config.js";
 import { pruneUploads } from "./uploads/retention.js";
 import { handleUploads } from "./uploads/routes.js";
+import { subagentMessages } from "./usage/subagent.js";
 import { usageConfig, type UsageConfig } from "./usage/config.js";
 import { handleUsage } from "./usage/routes.js";
 import { UsageService, type BudgetWarning } from "./usage/service.js";
@@ -131,6 +132,9 @@ export function createHub(opts: HubOptions): Hub {
     onSessionEnded: (id) => relays.forEach((r) => r.sessionEnded(id)),
     onEvent: (meta, seq, event) => {
       if (event.type === "message_end") usage.record(event.message, { sessionId: meta.id, cwd: meta.cwd, seq });
+      else if (event.type === "tool_execution_end" && event.toolName === "subagent") {
+        subagentMessages(event.result).forEach((m, i) => usage.record(m, { sessionId: meta.id, cwd: meta.cwd, seq, fallbackId: `${meta.id}:${String(seq)}:subagent:${String(i)}` }));
+      }
     },
   });
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_BROWSER_FRAME });

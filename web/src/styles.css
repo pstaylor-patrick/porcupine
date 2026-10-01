@@ -530,3 +530,16 @@ details > :not(summary) { padding: 0 12px 10px; }
 .budget-banner[hidden] { display: none; }
 .budget-banner span { flex: 1; }
 .budget-banner[data-level="error"] { border-color: currentColor; font-weight: 600; }
+
+/* Subagent children inside the subagent tool card. */
+.subagents { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.subagent { border-radius: 6px; }
+.subagent summary { display: flex; gap: 8px; align-items: baseline; cursor: pointer; }
+.subagent-name { font-family: ui-monospace, Menlo, monospace; font-weight: 600; }
+.subagent-model { font-size: 0.8em; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.subagent-status { margin-left: auto; font-size: 0.8em; color: var(--muted); }
+.subagent-running .subagent-status { color: var(--fg); }
+.subagent-error .subagent-status { color: var(--fg); font-weight: 700; }
+.subagent-task { font-size: 0.85em; color: var(--muted); margin-top: 4px; white-space: pre-wrap; }
+.subagent-tail { background: var(--code); padding: 8px; border-radius: 6px; font-size: 0.85em; max-height: 40vh; overflow: auto; white-space: pre-wrap; }
+.subagent-usage { font-size: 0.8em; color: var(--muted); }

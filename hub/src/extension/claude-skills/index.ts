@@ -28,7 +28,7 @@ export interface SkillsOptions {
 
 export default function claudeSkills(pi: Api, opts: SkillsOptions = {}): void {
   const root = opts.root ?? join(process.env.HOME ?? homedir(), ".claude", "skills");
-  const avail = opts.avail ?? { subagent: false };
+  const avail = opts.avail ?? { subagent: true };
   for (const skill of discoverSkills(root)) {
     pi.registerCommand(skill.name, {
       description: skill.description.length > 200 ? `${skill.description.slice(0, 197)}...` : skill.description,

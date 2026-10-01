@@ -12,6 +12,8 @@ export interface ToolState {
   argsText: string;
   status: "pending" | "running" | "done" | "error";
   output: string;
+  /** Structured result details (e.g. per-child state for the subagent tool). */
+  details?: unknown;
 }
 
 export type Item =
@@ -162,6 +164,7 @@ function applyToolResultMessage(t: Transcript, m: Rec): void {
   const id = str(m.toolCallId);
   const s = tool(t, id, str(m.toolName));
   s.output = contentText(m.content);
+  if (m.details !== undefined) s.details = m.details;
   s.status = m.isError === true ? "error" : "done";
   touchTool(t, id);
 }
@@ -310,9 +313,11 @@ export function applyEvent(t: Transcript, ev: Rec): void {
       else if (type === "tool_execution_update") {
         s.status = "running";
         s.output = resultText(ev.partialResult);
+        if (isRec(ev.partialResult) && ev.partialResult.details !== undefined) s.details = ev.partialResult.details;
       } else {
         s.status = ev.isError === true ? "error" : "done";
         s.output = resultText(ev.result);
+        if (isRec(ev.result) && ev.result.details !== undefined) s.details = ev.result.details;
       }
       if (!t.toolOwner.has(id)) {
         const owner = currentAssistant(t) ?? newAssistant(t, null);

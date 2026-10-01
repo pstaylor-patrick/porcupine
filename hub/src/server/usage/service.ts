@@ -77,12 +77,12 @@ export class UsageService {
   }
 
   /** Records an assistant message_end from a live session. */
-  record(message: unknown, ctx: { sessionId: string; cwd: string; seq: number }): void {
+  record(message: unknown, ctx: { sessionId: string; cwd: string; seq: number; fallbackId?: string }): void {
     const row = rowFromMessage(message, {
       sessionId: ctx.sessionId,
       piSessionId: null,
       cwd: ctx.cwd,
-      fallbackId: `${ctx.sessionId}:${String(ctx.seq)}`,
+      fallbackId: ctx.fallbackId ?? `${ctx.sessionId}:${String(ctx.seq)}`,
       ts: new Date(this.now()).toISOString(),
     });
     if (!row) return;

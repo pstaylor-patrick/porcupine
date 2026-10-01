@@ -1,5 +1,6 @@
 /** DOM rendering. Model output only ever reaches the DOM through textContent / text nodes. */
 import { renderMarkdown } from "./markdown.js";
+import { renderSubagentChildren } from "./subagent.js";
 import type { Item, ToolState, Transcript } from "./transcript.js";
 
 export const ARGS_LIMIT = 2048;
@@ -84,6 +85,11 @@ export function renderTool(s: ToolState, open: Set<string>): HTMLElement {
   );
   details.append(summary);
   if (s.argsText) details.append(truncated(s.argsText, ARGS_LIMIT, "tool-args"));
+  const children = s.name === "subagent" ? renderSubagentChildren(s.details, open, s.id) : null;
+  if (children) {
+    details.append(children);
+    if (s.status === "running") return details;
+  }
   if (s.output) details.append(truncated(s.output, OUTPUT_LIMIT, "tool-output"));
   return details;
 }
