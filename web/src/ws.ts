@@ -6,6 +6,10 @@ export interface SessionInfo {
   cwd: string;
   model: string | null;
   isStreaming: boolean;
+  /** Settled since a client last viewed it. */
+  unread?: boolean;
+  /** An extension dialog is waiting for an answer. */
+  needsInput?: boolean;
   startedAt: string;
   piVersion?: string | null;
 }
@@ -133,12 +137,21 @@ export class Connection {
       this.missedPongs = 0;
       this.h.onStatus("open");
       this.raw({ t: "list" });
+      if (!this.visible) this.raw({ t: "view", visible: false });
       if (this.sessionId) this.raw({ t: "attach", session: this.sessionId, since: this.lastSeq });
       this.pingTimer = this.o.setInterval(() => this.ping(), PING_MS);
     };
     s.onmessage = (ev) => this.receive(ev.data);
     s.onclose = () => this.dropped(s);
     s.onerror = () => s.close();
+  }
+
+  private visible = true;
+
+  /** Tells the hub whether the page is in the foreground, so it can mark sessions read and skip pushes. */
+  setVisible(visible: boolean): void {
+    this.visible = visible;
+    this.raw({ t: "view", visible });
   }
 
   /** Reconnects now (visibilitychange, online), skipping any pending backoff. */

@@ -25,6 +25,11 @@ import { usageConfig, type UsageConfig } from "./usage/config.js";
 import { handleUsage } from "./usage/routes.js";
 import { UsageService, type BudgetWarning } from "./usage/service.js";
 import type { FetchLike } from "./usage/openrouter.js";
+import { Notifier } from "./push/notifier.js";
+import { handlePush } from "./push/routes.js";
+import { PushSender, type PushFetch } from "./push/send.js";
+import { SubscriptionStore } from "./push/store.js";
+import { loadOrCreateVapid, vapidPath } from "./push/vapid.js";
 import { applySecurityHeaders, isPublicPath, serveStatic } from "./static.js";
 
 export interface HubOptions {
@@ -41,6 +46,9 @@ export interface HubOptions {
   /** cf's bin directory (default ~/.claude/cf/bin, or PORCUPINE_CF_BIN). */
   cfBin?: string;
   ruby?: RubyRunner;
+  /** VAPID key file (default ${XDG_CONFIG_HOME:-~/.config}/porcupine/vapid.json). */
+  vapidFile?: string;
+  pushFetch?: PushFetch | undefined;
 }
 
 export interface Hub {
@@ -89,14 +97,26 @@ export function createHub(opts: HubOptions): Hub {
   const limiter = opts.limiter ?? new LoginRateLimiter({ perIp: 5, global: 20, windowMs: 15 * 60 * 1000, now });
   const secure = !config.dev;
   const relays = new Set<BrowserRelay>();
+  const usageCfg = opts.usage ?? usageConfig(process.env, homedir());
+  const pushStore = new SubscriptionStore(join(usageCfg.dir, "push-subscriptions.json"));
+  const pushSender = new PushSender({
+    keys: loadOrCreateVapid(opts.vapidFile ?? vapidPath(process.env, homedir())),
+    store: pushStore,
+    subject: process.env.PORCUPINE_VAPID_SUBJECT?.trim() || undefined,
+    fetch: opts.pushFetch,
+    now,
+    log,
+  });
+  const notifier = new Notifier((m) => pushSender.send(m));
   const usage = new UsageService({
-    config: opts.usage ?? usageConfig(process.env, homedir()),
+    config: usageCfg,
     now,
     log,
     fetch: opts.usageFetch,
     onBudgetWarning: (w) => {
       log(`budget warning: ${w.provider} ${String(w.threshold)}%`);
       relays.forEach((r) => r.notice(w.threshold >= 100 ? "error" : "warn", w.text));
+      notifier.budget(w.text);
       opts.onBudgetWarning?.(w);
     },
   });
@@ -105,6 +125,9 @@ export function createHub(opts: HubOptions): Hub {
     log,
     rescanMs: opts.rescanMs ?? 5000,
     onChange: () => relays.forEach((r) => r.sessionsChanged()),
+    isViewed: (id) => [...relays].some((r) => r.viewing(id)),
+    onSettled: (meta, viewed) => notifier.settled(meta, viewed),
+    onNeedsInput: (meta, title, viewed) => notifier.needsInput(meta, title, viewed),
     onSessionEnded: (id) => relays.forEach((r) => r.sessionEnded(id)),
     onEvent: (meta, seq, event) => {
       if (event.type === "message_end") usage.record(event.message, { sessionId: meta.id, cwd: meta.cwd, seq });
@@ -196,6 +219,7 @@ export function createHub(opts: HubOptions): Hub {
       })
     )
       return;
+    if (await handlePush(req, res, { sender: pushSender, store: pushStore, origins: config.origins, authed, log })) return;
     if (await handleUsage(req, res, { service: usage, origins: config.origins, authed, log })) return;
     if (path.startsWith("/api/")) {
       res.writeHead(404, { "Content-Type": "text/plain" }).end("not found\n");

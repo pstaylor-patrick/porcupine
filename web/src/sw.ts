@@ -1,4 +1,4 @@
-/** Service worker: caches the app shell only. Never touches /api or /ws. */
+/** Service worker: caches the app shell (never /api or /ws) and shows Web Push notifications. */
 
 declare const __SHELL__: string[];
 declare const __VERSION__: string;
@@ -58,4 +58,40 @@ sw.addEventListener("fetch", (e) => {
         .catch(() => caches.match("/").then((hit) => hit ?? Response.error())),
     );
   }
+});
+
+interface PushPayload {
+  title?: string;
+  body?: string;
+  session?: string;
+  tag?: string;
+}
+
+sw.addEventListener("push", (e) => {
+  let p: PushPayload = {};
+  try {
+    p = (e.data?.json() ?? {}) as PushPayload;
+  } catch {
+    p = { body: e.data?.text() ?? "" };
+  }
+  const opts: NotificationOptions = { body: p.body ?? "", icon: "/icons/icon-192.png", data: { session: p.session ?? null } };
+  if (p.tag) opts.tag = p.tag;
+  e.waitUntil(sw.registration.showNotification(p.title ?? "Porcupine", opts));
+});
+
+sw.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const data = e.notification.data as { session?: string | null } | null;
+  const session = data?.session ?? null;
+  e.waitUntil(
+    sw.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (wins) => {
+      const win = wins.find((w) => new URL(w.url).origin === sw.location.origin);
+      if (win) {
+        if (session) win.postMessage({ type: "open-session", session });
+        await win.focus();
+        return;
+      }
+      await sw.clients.openWindow(session ? `/?session=${encodeURIComponent(session)}` : "/");
+    }),
+  );
 });

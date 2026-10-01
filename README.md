@@ -132,6 +132,17 @@ Files are kept under `~/.local/share/porcupine/uploads/<session>/` (or
 `$XDG_DATA_HOME/porcupine/uploads`) and deleted after 30 days, checked at hub
 start and daily.
 
+## Notifications and background agents
+
+The sidebar marks each session as running (pulsing dot), unread (solid dot: it finished while nobody was looking at it), or waiting for input (`?`). Opening a session marks it read.
+
+Settings > Notifications turns on Web Push for the current device. You get a notification when an agent finishes or an extension dialog (ask_user_question, a hook confirm) is waiting in a session you are not looking at, and when a budget crosses 80% or 100%. Tapping it opens that session.
+
+- **iPhone and iPad:** Web Push only works when Porcupine is installed to the home screen (Share > Add to Home Screen) and opened from that icon. In a Safari tab the toggle stays unavailable.
+- The hub generates VAPID keys once into `${XDG_CONFIG_HOME:-~/.config}/porcupine/vapid.json` (mode 0600). Keep that file: replacing it invalidates every subscription. Set `PORCUPINE_VAPID_SUBJECT` (for example `mailto:you@example.com`) to change the contact sent to push services; the default is `mailto:porcupine@localhost`.
+- Subscriptions live in `${XDG_DATA_HOME:-~/.local/share}/porcupine/push-subscriptions.json`; ones the push service reports gone (404/410) are dropped.
+- Sessions are still started from a terminal; there is no spawn button.
+
 ## Optional: DNS and TLS on AWS
 
 `infra/` is a Terraform example for a public hostname that points at a private

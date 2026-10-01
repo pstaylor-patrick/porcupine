@@ -52,6 +52,7 @@ import {
   type SheetState,
 } from "./models.js";
 import { Connection, type PiResponse, type ServerFrame, type SessionInfo } from "./ws.js";
+import { disablePush, enablePush, pushHint, pushState } from "./push.js";
 
 export function appTitle(): string {
   return "Porcupine";
@@ -122,6 +123,8 @@ function isRec(v: unknown): v is Record<string, unknown> {
 export class App {
   t: Transcript = emptyTranscript();
   sessions: SessionInfo[] = [];
+  /** Session named by a notification click, attached once the session list arrives. */
+  pendingOpen: string | null = null;
   /** False until the hub's first session list, so a reload doesn't flash the empty states. */
   private sessionsLoaded = false;
   models: ModelInfo[] = [];
@@ -252,6 +255,7 @@ export class App {
     $("settings-back").addEventListener("click", () => this.close("settings"));
     $("logout").addEventListener("click", () => void this.logout());
     $("reload-app").addEventListener("click", () => void reloadLatest());
+    $("push-toggle").addEventListener("change", (e) => void this.togglePush((e.target as HTMLInputElement).checked));
     $("budget-add").addEventListener("click", () => addBudgetRow($("budget-rows")));
     $("budget-form").addEventListener("submit", (e) => {
       e.preventDefault();
@@ -433,6 +437,28 @@ export class App {
     $("settings-pi-row").hidden = !pi;
     $("settings-pi-version").textContent = pi ?? "";
     $("settings-app-version").textContent = APP_VERSION;
+    void this.syncPush();
+  }
+
+  async syncPush(): Promise<void> {
+    const toggle = $("push-toggle") as HTMLInputElement;
+    const st = await pushState();
+    toggle.disabled = st === "unsupported" || st === "denied";
+    toggle.checked = st === "on";
+    $("push-status").textContent = pushHint(st);
+  }
+
+  async togglePush(on: boolean): Promise<void> {
+    $("push-status").textContent = on ? "Subscribing..." : "Turning off...";
+    try {
+      if (on) await enablePush();
+      else await disablePush();
+    } catch (e) {
+      $("push-status").textContent = `Notifications: ${(e as Error).message}`;
+      ($("push-toggle") as HTMLInputElement).checked = !on;
+      return;
+    }
+    await this.syncPush();
   }
 
   /** Fetches GET /api/usage; refreshes the banner and, with `form`, the budget form. */
@@ -504,7 +530,10 @@ export class App {
       case "sessions":
         this.sessions = f.sessions;
         this.sessionsLoaded = true;
-        if (!this.conn.sessionId && f.sessions.length === 1 && f.sessions[0]) this.attach(f.sessions[0].id);
+        if (this.pendingOpen && f.sessions.some((s) => s.id === this.pendingOpen)) {
+          this.attach(this.pendingOpen);
+          this.pendingOpen = null;
+        } else if (!this.conn.sessionId && f.sessions.length === 1 && f.sessions[0]) this.attach(f.sessions[0].id);
         else if (this.conn.sessionId && !f.sessions.some((s) => s.id === this.conn.sessionId)) this.sessionGone();
         this.renderSessions();
         return;
@@ -1073,6 +1102,20 @@ export class App {
         const name = document.createElement("span");
         name.className = "session-name";
         name.textContent = s.name;
+        if (s.needsInput) {
+          const q = document.createElement("span");
+          q.className = "session-badge session-needs-input";
+          q.textContent = "?";
+          q.setAttribute("role", "img");
+          q.setAttribute("aria-label", "needs input");
+          name.append(q);
+        } else if (s.unread && !s.isStreaming && s.id !== this.conn.sessionId) {
+          const u = document.createElement("span");
+          u.className = "session-unread";
+          u.setAttribute("role", "img");
+          u.setAttribute("aria-label", "unread");
+          name.append(u);
+        }
         if (s.isStreaming) {
           const dot = document.createElement("span");
           dot.className = "session-streaming";
@@ -1198,8 +1241,20 @@ export function start(): void {
   app = new App(conn);
   app.bind();
   pinToVisualViewport();
+  app.pendingOpen = new URLSearchParams(location.search).get("session");
+  if (app.pendingOpen) history.replaceState(null, "", "/");
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") conn.kick();
+    const visible = document.visibilityState === "visible";
+    conn.setVisible(visible);
+    if (visible) conn.kick();
+  });
+  if (document.visibilityState === "hidden") conn.setVisible(false);
+  navigator.serviceWorker?.addEventListener("message", (e: MessageEvent<unknown>) => {
+    const d = e.data as { type?: unknown; session?: unknown } | null;
+    if (d?.type === "open-session" && typeof d.session === "string") {
+      if (app.sessions.some((s) => s.id === d.session)) app.selectSession(d.session);
+      else app.pendingOpen = d.session;
+    }
   });
   window.addEventListener("online", () => conn.kick());
   conn.connect();

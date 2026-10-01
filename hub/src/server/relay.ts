@@ -8,6 +8,7 @@ export const MAX_BROWSER_FRAME = 1024 * 1024;
 type BrowserFrame =
   | { t: "list" }
   | { t: "ping" }
+  | { t: "view"; visible: boolean }
   | { t: "attach"; session: string; since: number | null }
   | { t: "cmd"; cid: string; cmd: PiCommand };
 
@@ -15,6 +16,7 @@ function parseFrame(data: RawData): BrowserFrame | null {
   try {
     const f = JSON.parse(data.toString()) as Record<string, unknown>;
     if (f.t === "list" || f.t === "ping") return f as BrowserFrame;
+    if (f.t === "view" && typeof f.visible === "boolean") return { t: "view", visible: f.visible };
     if (f.t === "attach" && typeof f.session === "string") {
       return { t: "attach", session: f.session, since: typeof f.since === "number" ? f.since : null };
     }
@@ -32,6 +34,8 @@ export class BrowserRelay {
   private conn: CliConnection | null = null;
   private session: string | null = null;
   private attachSeq = 0;
+  /** The page is in the foreground; set by the browser's "view" frames. */
+  private visible = true;
 
   constructor(
     private readonly ws: WebSocket,
@@ -47,6 +51,11 @@ export class BrowserRelay {
 
   send(frame: unknown): void {
     if (this.ws.readyState === this.ws.OPEN) this.ws.send(JSON.stringify(frame));
+  }
+
+  /** True when this browser has `id` attached and in the foreground. */
+  viewing(id: string): boolean {
+    return this.visible && this.session === id;
   }
 
   sessionsChanged(): void {
@@ -80,6 +89,10 @@ export class BrowserRelay {
         return this.send({ t: "pong" });
       case "list":
         return this.sessionsChanged();
+      case "view":
+        this.visible = f.visible;
+        if (f.visible && this.session) this.registry.markRead(this.session);
+        return;
       case "cmd":
         if (!this.conn) return this.send({ t: "result", cid: f.cid, response: { success: false, error: "not attached" } });
         return this.conn.send({ t: "cmd", cid: f.cid, cmd: f.cmd });
@@ -127,5 +140,6 @@ export class BrowserRelay {
     }
     this.conn = conn;
     this.session = id;
+    if (this.visible) this.registry.markRead(id);
   }
 }

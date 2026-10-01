@@ -48,7 +48,7 @@ beforeEach(async () => {
   mkdirSync(join(dir, "web", "crayon"));
   writeFileSync(join(dir, "web", "crayon", "scribble.svg"), "<svg/>");
   session = null;
-  hub = createHub({ config: config(), log: () => undefined, rescanMs: 100, uploads: uploadConfig({}, dir), maxUploadBytes: 1024, usage: { dir: join(dir, "data"), piSessionsDir: join(dir, "pi-sessions"), openrouterKey: null } });
+  hub = createHub({ config: config(), log: () => undefined, rescanMs: 100, uploads: uploadConfig({}, dir), maxUploadBytes: 1024, usage: { dir: join(dir, "data"), piSessionsDir: join(dir, "pi-sessions"), openrouterKey: null }, vapidFile: join(dir, "vapid.json") });
   const { port } = await hub.listen();
   base = `http://127.0.0.1:${port}`;
 });
@@ -279,6 +279,7 @@ describe("uploads", () => {
     const other = createHub({
       config: config(),
       log: () => undefined,
+      vapidFile: join(dir, "vapid.json"),
       uploads: uploadConfig({ PORCUPINE_CONFIRM_USD: "0.25", PORCUPINE_CONFIRM_MINUTES: "3" }, dir),
     });
     const { port } = await other.listen();
@@ -345,5 +346,29 @@ describe("relay", () => {
     session = null;
     await b2.until((f) => f.t === "session_ended");
     await waitFor(() => hub.registry.list().length === 0);
+  });
+});
+
+describe("push routes", () => {
+  const subscription = {
+    endpoint: "https://push.example.net/sub/1",
+    keys: { p256dh: Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 1)]).toString("base64url"), auth: Buffer.alloc(16, 2).toString("base64url") },
+  };
+  it("requires auth and a good Origin", async () => {
+    expect((await fetch(`${base}/api/push/key`)).status).toBe(401);
+    const body = JSON.stringify(subscription);
+    expect((await fetch(`${base}/api/push/subscribe`, { method: "POST", headers: { Origin: ORIGIN }, body })).status).toBe(401);
+    expect((await fetch(`${base}/api/push/subscribe`, { method: "POST", headers: { Cookie: cookie(), Origin: "https://evil.example" }, body })).status).toBe(403);
+    expect((await fetch(`${base}/api/push/unsubscribe`, { method: "POST", headers: { Cookie: cookie() }, body })).status).toBe(403);
+  });
+  it("serves the public key and stores subscriptions", async () => {
+    const key = (await (await fetch(`${base}/api/push/key`, { headers: { Cookie: cookie() } })).json()) as { publicKey: string };
+    expect(Buffer.from(key.publicKey, "base64url")).toHaveLength(65);
+    const headers = { Cookie: cookie(), Origin: ORIGIN, "Content-Type": "application/json" };
+    expect((await fetch(`${base}/api/push/subscribe`, { method: "POST", headers, body: "{}" })).status).toBe(400);
+    expect((await fetch(`${base}/api/push/subscribe`, { method: "POST", headers, body: JSON.stringify(subscription) })).status).toBe(200);
+    expect(existsSync(join(dir, "data", "push-subscriptions.json"))).toBe(true);
+    const off = await fetch(`${base}/api/push/unsubscribe`, { method: "POST", headers, body: JSON.stringify({ endpoint: subscription.endpoint }) });
+    expect(off.status).toBe(200);
   });
 });
