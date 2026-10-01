@@ -145,7 +145,7 @@
           <p id="autocompact-hint" class="field-hint">Tokens. Leave empty for the default.</p>
         </div>
         <div class="sheet-actions">
-          <button id="compact-now" type="button" class="tonal">Compact now</button>
+          <button id="compact-now" type="button" class="secondary">Compact now</button>
           <button id="new-session" type="button" class="primary">New conversation</button>
         </div>
       </div>
@@ -160,6 +160,11 @@
         <div><dt>App version</dt><dd id="settings-app-version"></dd></div>
         <div id="settings-pi-row" hidden><dt>pi version</dt><dd id="settings-pi-version"></dd></div>
       </dl>
+      <section class="settings-section" aria-labelledby="push-title">
+        <h3 id="push-title" class="settings-subtitle">Notifications</h3>
+        <label class="push-row"><input id="push-toggle" type="checkbox" role="switch"> Push notifications on this device</label>
+        <p id="push-status" class="field-hint" role="status" aria-live="polite"></p>
+      </section>
       <section class="settings-section" aria-labelledby="usage-title">
         <h3 id="usage-title" class="settings-subtitle">Usage</h3>
         <div id="usage-body" class="usage-body"><p class="field-hint">Loading...</p></div>
@@ -177,7 +182,7 @@
         </form>
       </section>
       <button id="reload-app" type="button" class="secondary settings-logout settings-reload">Reload latest version</button>
-      <button id="logout" type="button" class="danger settings-logout">Log out</button>
+      <button id="logout" type="button" class="secondary settings-logout">Log out</button>
     </section>
   </body>
 </html>

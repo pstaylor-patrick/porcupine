@@ -188,6 +188,9 @@ select {
 .session-name { font-weight: 600; display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .session-streaming { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--crayon); animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: 0.35; } }
+.session-unread { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--fg); }
+.session-badge { flex: none; font-size: 0.75em; line-height: 1; padding: 2px 5px; border-radius: 999px; background: var(--crayon); color: var(--bg); }
+.push-row { display: flex; align-items: center; gap: 8px; min-height: 44px; }
 .session-cwd { font-size: 0.8em; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-foot { border-top: 1px solid var(--line); padding-top: 8px; }
 .sidebar-link { width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 10px 8px; min-height: 44px; cursor: pointer; }
@@ -240,7 +243,8 @@ select {
 .model-option[aria-selected="true"] { font-weight: 700; color: var(--fg); }
 .toggle { display: flex; align-items: center; gap: 8px; min-height: 40px; }
 .toggle input { width: 20px; height: 20px; }
-.secondary { min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-weight: 600; cursor: pointer; }
+/* One primary (plum) per screen; every other action is secondary (lilac tint). */
+.secondary { min-height: 44px; border-radius: 10px; border: 0; background: color-mix(in srgb, var(--crayon) 22%, var(--bg)); color: var(--fg); font-weight: 600; cursor: pointer; }
 .secondary:disabled { opacity: 0.5; cursor: default; }
 
 /* Global settings screen. */
@@ -260,7 +264,7 @@ select {
 .settings-list dt { color: var(--muted); }
 .settings-list dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
 .settings-logout { display: block; width: 100%; max-width: 640px; margin: 0 auto; min-height: 44px; border: 0; border-radius: 10px; font-weight: 600; cursor: pointer; }
-.settings-reload { margin-bottom: 12px; border: 1px solid var(--line); }
+.settings-reload { margin-bottom: 12px; }
 
 .main { grid-area: main; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
 .transcript {
@@ -372,7 +376,6 @@ details > :not(summary) { padding: 0 12px 10px; }
 .attach-confirm { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--radius); border: 1px solid var(--fg); background: var(--bg); }
 .attach-confirm-title { margin: 0; overflow-wrap: anywhere; }
 .attach-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-.composer .attach-confirm-actions .secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
 [hidden] { display: none !important; }
 
 @media (min-width: 900px) {
@@ -487,7 +490,6 @@ details > :not(summary) { padding: 0 12px 10px; }
 .sheet-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 .sheet-actions button { min-height: 48px; border-radius: 12px; border: 0; font: inherit; font-weight: 600; cursor: pointer; }
 .sheet-actions button:disabled { opacity: 0.5; cursor: default; }
-.tonal { background: color-mix(in srgb, var(--crayon) 22%, var(--bg)); color: var(--fg); }
 .switch { position: relative; display: inline-flex; flex: none; cursor: pointer; }
 .switch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
 .switch span { width: 44px; height: 26px; border-radius: 999px; background: var(--line); transition: background 0.2s ease; }
