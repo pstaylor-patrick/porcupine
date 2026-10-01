@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { applyActivity } from "../src/server/registry.js";
 import { b64u, encryptPayload, unb64u, vapidJwt } from "../src/server/push/crypto.js";
-import { Notifier } from "../src/server/push/notifier.js";
+import { ASK_TITLE_PREFIX } from "../src/extension/ask-user-question.js";
+import { Notifier, readableTitle } from "../src/server/push/notifier.js";
 import { PushSender, type PushFetch } from "../src/server/push/send.js";
 import { SubscriptionError, SubscriptionStore, validateSubscription } from "../src/server/push/store.js";
 import { loadOrCreateVapid, vapidPath } from "../src/server/push/vapid.js";
@@ -118,5 +119,14 @@ describe("triggers", () => {
     applyActivity(v, { type: "agent_end" }, true);
     expect(v.unread).toBe(false);
     expect(applyActivity(v, { type: "extension_ui_request", method: "notify" }, false).needsInput).toBeNull();
+  });
+});
+
+describe("readableTitle", () => {
+  it("shows the first asked question instead of the encoded payload", () => {
+    const t = `${ASK_TITLE_PREFIX}${JSON.stringify({ questions: [{ question: "Pizza?" }, { question: "Time?" }] })}`;
+    expect(readableTitle(t)).toBe("Pizza? (+1 more)");
+    expect(readableTitle("Confirm delete")).toBe("Confirm delete");
+    expect(readableTitle(`${ASK_TITLE_PREFIX}{bad`)).toBe("");
   });
 });
