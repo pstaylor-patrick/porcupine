@@ -103,7 +103,8 @@ export function createHub(opts: HubOptions): Hub {
   const pushSender = new PushSender({
     keys: loadOrCreateVapid(opts.vapidFile ?? vapidPath(process.env, homedir())),
     store: pushStore,
-    subject: process.env.PORCUPINE_VAPID_SUBJECT?.trim() || undefined,
+    // Apple rejects a mailto:...@localhost subject (403 BadJwtToken); the public origin is accepted.
+    subject: process.env.PORCUPINE_VAPID_SUBJECT?.trim() || config.origins.find((o) => o.startsWith("https://")),
     fetch: opts.pushFetch,
     now,
     log,
