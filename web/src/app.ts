@@ -1,4 +1,17 @@
 /** App controller: wires the connection, transcript model, renderer and composer together. */
+import {
+  chipWarning,
+  classify,
+  DEFAULT_MAX_BYTES,
+  http as uploadsHttp,
+  MAX_ATTACHMENTS,
+  renderChips,
+  renderConfirm,
+  sendWithAttachments,
+  type Http,
+  type Pending,
+  type UploadsConfig,
+} from "./attachments.js";
 import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
 import { TranscriptView } from "./render.js";
 import { applyEvent, emptyTranscript, fromMessages, type Transcript } from "./transcript.js";
@@ -120,6 +133,11 @@ export class App {
   private renderQueued = false;
   private readonly view: TranscriptView;
   private readonly input = $("input") as HTMLTextAreaElement;
+  /** Files attached to the next message; nothing is uploaded until Send. */
+  pending: Pending[] = [];
+  uploadsHttp: Http = uploadsHttp;
+  private uploadsConfig: UploadsConfig | null = null;
+  private sending = false;
   private readonly main = $("main");
 
   constructor(readonly conn: Connection) {
@@ -170,6 +188,12 @@ export class App {
       this.queueRender();
     });
     $("abort").addEventListener("click", () => void this.abort());
+    const fileInput = $("file-input") as HTMLInputElement;
+    $("attach").addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      this.addFiles(Array.from(fileInput.files ?? []));
+      fileInput.value = "";
+    });
     $("menu-button").addEventListener("click", () => this.toggleSidebar());
     $("sheet-button").addEventListener("click", () => (this.overlays.includes("sheet") ? this.close("sheet") : this.openSheet()));
     $("session-title").addEventListener("click", () =>
@@ -457,21 +481,114 @@ export class App {
     if (typeof d.thinkingLevel === "string") this.thinkingLevel = d.thinkingLevel;
     if (typeof d.isStreaming === "boolean") this.t.isStreaming = d.isStreaming;
     this.renderHeader();
+    this.renderAttachments();
     this.queueRender();
   }
 
   // ---- commands -------------------------------------------------------
 
+  // ---- attachments ----------------------------------------------------
+
+  addFiles(files: File[]): void {
+    for (const file of files) {
+      if (this.pending.length >= MAX_ATTACHMENTS) {
+        this.notice("warn", `at most ${MAX_ATTACHMENTS} attachments per message; ${file.name} not added`);
+        continue;
+      }
+      this.pending.push({ file, kind: classify(file) });
+    }
+    this.renderAttachments();
+    if (!this.uploadsConfig) void this.loadUploadsConfig();
+  }
+
+  removeAttachment(i: number): void {
+    this.pending.splice(i, 1);
+    this.renderAttachments();
+  }
+
+  private async loadUploadsConfig(): Promise<UploadsConfig | null> {
+    try {
+      this.uploadsConfig = await this.uploadsHttp.getConfig();
+    } catch (e) {
+      this.notice("error", `attachments: ${(e as Error).message}`);
+      return null;
+    }
+    this.renderAttachments();
+    return this.uploadsConfig;
+  }
+
+  renderAttachments(): void {
+    const cfg = this.uploadsConfig;
+    for (const p of this.pending) {
+      p.warn = chipWarning(p.kind, this.model, p.file.size, cfg?.maxBytes ?? DEFAULT_MAX_BYTES, cfg?.whisper ?? true);
+    }
+    renderChips($("attachments"), this.pending, (i) => this.removeAttachment(i), this.sending);
+    ($("attach") as HTMLButtonElement).disabled = this.sending || this.conn.sessionId === null;
+    ($("send") as HTMLButtonElement).disabled = this.sending;
+  }
+
+  private attachStatus(text: string): void {
+    const el = $("attach-status");
+    el.textContent = text;
+    el.hidden = text === "";
+  }
+
+  private async sendAttachments(text: string, sid: string): Promise<string | null> {
+    const cfg = this.uploadsConfig ?? (await this.loadUploadsConfig());
+    if (!cfg) return null;
+    const tooBig = this.pending.find((p) => p.file.size > cfg.maxBytes);
+    if (tooBig) {
+      this.notice("error", `${tooBig.file.name} is too large`);
+      return null;
+    }
+    this.sending = true;
+    this.renderAttachments();
+    try {
+      return await sendWithAttachments({
+        session: sid,
+        message: text,
+        pending: this.pending,
+        model: this.model,
+        http: this.uploadsHttp,
+        config: cfg,
+        rerender: () => this.renderAttachments(),
+        status: (t) => this.attachStatus(t),
+        confirm: (b) => renderConfirm($("attach-confirm"), b),
+      });
+    } catch (e) {
+      this.notice("error", `attachments: ${(e as Error).message}`);
+      return null;
+    } finally {
+      this.sending = false;
+      this.attachStatus("");
+      this.renderAttachments();
+    }
+  }
+
   async send(): Promise<void> {
-    const text = this.input.value;
-    if (!text.trim() || !this.conn.sessionId) return;
+    if (this.sending) return;
+    let text = this.input.value;
+    const sid = this.conn.sessionId;
+    if (!sid) return;
+    const withFiles = this.pending.length > 0;
+    if (!text.trim() && !withFiles) return;
+    if (withFiles) {
+      const full = await this.sendAttachments(text, sid);
+      if (full === null || this.conn.sessionId !== sid) return;
+      text = full;
+    }
     const steer = ($("steer") as HTMLInputElement).checked;
     const cmd = buildPrompt(text, this.t.isStreaming, steer ? "steer" : "followUp");
+    const typed = this.input.value;
     this.input.value = "";
     this.autogrow();
     const r = await this.conn.command(cmd);
+    if (r.success && withFiles) {
+      this.pending = [];
+      this.renderAttachments();
+    }
     if (!r.success) {
-      if (!this.input.value) this.input.value = text;
+      if (!this.input.value) this.input.value = typed;
       this.notice("error", `prompt rejected: ${r.error ?? "unknown error"}`);
       void this.refreshState();
     }
@@ -497,6 +614,7 @@ export class App {
       pushRecent(recentStorage(), recentKey(this.model), this.models, this.model.provider);
     } else this.notice("error", `set model: ${r.error ?? "failed"}`);
     this.renderHeader();
+    this.renderAttachments();
     this.renderModels();
   }
 
@@ -729,6 +847,7 @@ export class App {
     cwd.hidden = !s;
     const attached = this.conn.sessionId !== null;
     ($("new-session") as HTMLButtonElement).disabled = !attached;
+    ($("attach") as HTMLButtonElement).disabled = this.sending || !attached;
   }
 
   renderSessions(): void {

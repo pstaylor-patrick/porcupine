@@ -355,6 +355,23 @@ details > :not(summary) { padding: 0 12px 10px; }
 .primary { background: var(--accent); color: var(--accent-fg); }
 .danger { background: var(--fg); color: var(--bg); }
 .composer .icon-send { width: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
+.composer { flex-wrap: wrap; }
+.composer .attachments, .composer .attach-confirm, .composer .attach-status { flex: 1 0 100%; order: -1; }
+.composer .icon-attach { width: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--bg); color: var(--fg); border: 1px solid var(--line); }
+.composer .icon-attach:disabled, .composer .chip-remove:disabled { opacity: 0.5; }
+.attachments { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 100%; padding: 4px 4px 4px 10px; border-radius: 16px; border: 1px solid var(--line); background: var(--bg); font-size: 14px; }
+.chip[data-warn] { border-color: var(--fg); border-style: dashed; }
+.chip-kind { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); }
+.chip-name { min-width: 0; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-meta { color: var(--muted); font-variant-numeric: tabular-nums; }
+.chip-warn { flex: 1 0 100%; font-size: 12px; color: var(--fg); }
+.composer .chip-remove { min-height: 28px; width: 28px; padding: 0; border-radius: 50%; background: transparent; color: var(--fg); font-weight: 400; }
+.attach-status { font-size: 14px; color: var(--muted); }
+.attach-confirm { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--radius); border: 1px solid var(--fg); background: var(--bg); }
+.attach-confirm-title { margin: 0; overflow-wrap: anywhere; }
+.attach-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.composer .attach-confirm-actions .secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
 [hidden] { display: none !important; }
 
 @media (min-width: 900px) {

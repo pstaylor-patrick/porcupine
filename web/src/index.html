@@ -48,7 +48,11 @@
       <button id="dialog-reopen" type="button" class="dialog-reopen" hidden>pi is waiting for your answer</button>
       <form id="composer" class="composer" autocomplete="off">
         <button id="jump-bottom" type="button" class="jump-bottom" aria-label="Jump to latest" hidden><svg width="20" height="20" aria-hidden="true" focusable="false" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/></svg></button>
+        <div id="attach-confirm" class="attach-confirm" role="alertdialog" aria-labelledby="attach-confirm-title" hidden></div>
         <div id="attachments" class="attachments" hidden></div>
+        <button id="attach" type="button" class="icon-attach" aria-label="Attach files"><svg width="20" height="20" aria-hidden="true" focusable="false" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></svg></button>
+        <input id="file-input" type="file" multiple hidden accept="image/*,application/pdf,audio/*,video/*,.m4a,.mp3,.wav,.ogg,.opus,.aac,.flac,.amr,.caf,.mp4,.mov,.webm,.mkv,.m4v,text/*,.md,.json,.csv" />
+        <div id="attach-status" class="attach-status" role="status" aria-live="polite" hidden></div>
         <label class="visually-hidden" for="input">Message</label>
         <textarea id="input" rows="1" placeholder="Message pi" enterkeyhint="send"></textarea>
         <button id="send" type="submit" class="primary icon-send" aria-label="Send"><svg width="20" height="20" aria-hidden="true" focusable="false" viewBox="0 0 256 256" fill="currentColor"><path d="M231.87,114l-168-95.89A16,16,0,0,0,40.92,37.34L71.55,128,40.92,218.67A16,16,0,0,0,56,240a16.15,16.15,0,0,0,7.93-2.1l167.92-96.05a16,16,0,0,0,.05-27.89ZM56,224a.56.56,0,0,0,0-.12L85.74,136H144a8,8,0,0,0,0-16H85.74L56.06,32.16A.46.46,0,0,0,56,32l168,95.83Z"/></svg></button>
