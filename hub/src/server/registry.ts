@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, rmSync, watch, type FSWatcher } from "node:fs";
 import { join } from "node:path";
-import type { SessionMeta } from "../shared/protocol.js";
+import type { PiEvent, SessionMeta } from "../shared/protocol.js";
 import { sessionPaths } from "../shared/paths.js";
 import { CliConnection } from "./cli-connection.js";
 
@@ -25,6 +25,8 @@ export interface RegistryOptions {
   runtimeDir: string;
   onChange?: () => void;
   onSessionEnded?: (id: string) => void;
+  /** Every event frame from every session, e.g. for the usage ledger. */
+  onEvent?: (meta: SessionMeta, seq: number, event: PiEvent) => void;
   log?: (line: string) => void;
   isAlive?: (pid: number) => boolean;
   rescanMs?: number;
@@ -156,6 +158,11 @@ export class Registry {
           if (f.event.type === "agent_start") entry.isStreaming = true;
           if (f.event.type === "agent_end" || f.event.type === "agent_settled") entry.isStreaming = false;
           if (before !== entry.isStreaming) this.opts.onChange?.();
+          try {
+            this.opts.onEvent?.(entry.meta, f.seq, f.event);
+          } catch (e) {
+            this.opts.log?.(`event hook failed: ${(e as Error).message}`);
+          }
         } else if (f.t === "session_ended") {
           ended = true;
         }

@@ -25,6 +25,7 @@ export type ServerFrame =
   | { t: "result"; cid: string; response: PiResponse }
   | { t: "session_ended"; session: string }
   | { t: "error"; message: string }
+  | { t: "notice"; level: "info" | "warn" | "error"; text: string }
   | { t: "pong" };
 
 export interface SocketLike {

@@ -486,3 +486,21 @@ details > :not(summary) { padding: 0 12px 10px; }
 .notice h2 { margin: 0 0 8px; font-size: 18px; }
 .notice p { margin: 0 0 16px; line-height: 1.4; }
 .notice-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+/* Usage and budgets (settings), budget banner */
+.settings-section { max-width: 640px; margin: 16px auto; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.settings-subtitle { margin: 0 0 8px; font-size: 1rem; }
+.usage-provider + .usage-provider { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.usage-row, .usage-models li { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+.usage-models { list-style: none; margin: 6px 0 0; padding: 0; font-size: 0.85rem; }
+.usage-models li span:first-child { overflow-wrap: anywhere; }
+.usage-progress { width: 100%; height: 10px; }
+.usage-chart { display: block; width: 100%; height: 80px; margin-top: 4px; }
+.usage-bar { fill: currentColor; opacity: 0.6; }
+.budget-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.budget-row .budget-provider { flex: 2 1 8rem; min-width: 0; }
+.budget-row .budget-amount { flex: 1 1 5rem; min-width: 0; }
+.budget-banner { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 0.875rem; }
+.budget-banner[hidden] { display: none; }
+.budget-banner span { flex: 1; }
+.budget-banner[data-level="error"] { border-color: currentColor; font-weight: 600; }

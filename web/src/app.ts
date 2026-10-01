@@ -15,6 +15,18 @@ import {
   type UploadsConfig,
 } from "./attachments.js";
 import { StatusPanel } from "./status-panel.js";
+import {
+  addBudgetRow,
+  bannerFromReport,
+  formatUsd,
+  parseSessionUsage,
+  readBudgetForm,
+  renderBudgetForm,
+  renderUsage,
+  sessionUsageText,
+  type SessionUsage,
+  type UsageReport,
+} from "./usage.js";
 import { autocompactCommand, contextPercent, contextText, parseContextUsage, type ContextInfo } from "./context.js";
 import { DialogQueue, renderDialog, type Dialog, type DialogAnswer } from "./questions.js";
 import { TranscriptView } from "./render.js";
@@ -114,6 +126,8 @@ export class App {
   models: ModelInfo[] = [];
   model: ModelInfo | null = null;
   context: ContextInfo | null = null;
+  sessionUsage: SessionUsage | null = null;
+  usage: UsageReport | null = null;
   compacting = false;
   thinkingLevel = "off";
   connState: "connecting" | "open" | "closed" = "closed";
@@ -158,6 +172,7 @@ export class App {
         this.connState = s;
         const label = s === "open" ? "Connected" : s === "connecting" ? "Connecting" : "Disconnected";
         $("settings-conn").textContent = label;
+        if (s === "open") void this.loadUsage();
       },
     };
   }
@@ -235,6 +250,12 @@ export class App {
     $("settings-back").addEventListener("click", () => this.close("settings"));
     $("logout").addEventListener("click", () => void this.logout());
     $("reload-app").addEventListener("click", () => void reloadLatest());
+    $("budget-add").addEventListener("click", () => addBudgetRow($("budget-rows")));
+    $("budget-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      void this.saveBudgets();
+    });
+    $("budget-banner-close").addEventListener("click", () => ($("budget-banner").hidden = true));
     ($("thinking-select") as HTMLSelectElement).addEventListener("change", (e) => {
       void this.setThinking((e.target as HTMLSelectElement).value);
     });
@@ -308,6 +329,7 @@ export class App {
   openSettings(): void {
     if (this.overlays.includes("sidebar")) this.close("sidebar");
     this.renderSettings();
+    void this.loadUsage(true);
     this.open("settings", "settings-back");
   }
 
@@ -399,6 +421,54 @@ export class App {
     $("settings-app-version").textContent = APP_VERSION;
   }
 
+  /** Fetches GET /api/usage; refreshes the banner and, with `form`, the budget form. */
+  async loadUsage(form = false): Promise<void> {
+    let r: UsageReport;
+    try {
+      const res = await fetch("/api/usage", { credentials: "same-origin" });
+      if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
+      r = (await res.json()) as UsageReport;
+    } catch (e) {
+      if (form) $("usage-body").replaceChildren(document.createTextNode(`Usage unavailable: ${(e as Error).message}`));
+      return;
+    }
+    this.usage = r;
+    renderUsage($("usage-body"), r);
+    if (form) renderBudgetForm($("budget-rows"), r.budgets, r.providers.map((p) => p.provider));
+    const b = bannerFromReport(r);
+    if (b) this.showBanner(b.level, b.text);
+  }
+
+  showBanner(level: "info" | "warn" | "error", text: string): void {
+    const banner = $("budget-banner");
+    banner.dataset.level = level;
+    $("budget-banner-text").textContent = text;
+    banner.hidden = false;
+  }
+
+  async saveBudgets(): Promise<void> {
+    const status = $("budget-status");
+    const budgets = readBudgetForm($("budget-rows"));
+    if (typeof budgets === "string") {
+      status.textContent = budgets;
+      return;
+    }
+    status.textContent = "Saving...";
+    try {
+      const res = await fetch("/api/budgets", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ budgets }),
+      });
+      const body = (await res.json()) as { error?: string };
+      status.textContent = res.ok ? "Saved." : `Not saved: ${body.error ?? `HTTP ${String(res.status)}`}`;
+      if (res.ok) await this.loadUsage(true);
+    } catch (e) {
+      status.textContent = `Not saved: ${(e as Error).message}`;
+    }
+  }
+
   async logout(): Promise<void> {
     try {
       await fetch("/api/logout", { method: "POST", credentials: "same-origin" });
@@ -454,6 +524,10 @@ export class App {
       case "error":
         this.notice("error", f.message);
         return;
+      case "notice":
+        this.notice(f.level, f.text);
+        this.showBanner(f.level, f.text);
+        return;
       default:
         return;
     }
@@ -469,6 +543,7 @@ export class App {
       this.view.clear();
       this.model = null;
       this.context = null;
+      this.sessionUsage = null;
       this.compacting = false;
       this.renderContext();
     }
@@ -658,6 +733,7 @@ export class App {
     const [stats, state] = await Promise.all([this.conn.command({ type: "get_session_stats" }), this.conn.command({ type: "get_state" })]);
     if (this.conn.sessionId !== sid) return;
     this.context = stats.success ? parseContextUsage(stats.data) : null;
+    this.sessionUsage = stats.success ? parseSessionUsage(stats.data) : null;
     if (state.success && isRec(state.data) && typeof state.data.isCompacting === "boolean") this.compacting = state.data.isCompacting;
     this.renderContext();
   }
@@ -673,6 +749,12 @@ export class App {
     pct.title = label ? `Context used: ${contextText(c)}` : "";
     pct.hidden = label === null || this.conn.sessionId === null;
     const attached = this.conn.sessionId !== null;
+    const u = this.sessionUsage;
+    $("session-usage").textContent = sessionUsageText(u);
+    const cost = $("session-cost");
+    cost.textContent = u ? formatUsd(u.cost) : "";
+    cost.title = u ? `Session cost: ${sessionUsageText(u)}` : "";
+    cost.hidden = !u || !attached || u.cost === 0;
     ($("compact-now") as HTMLButtonElement).disabled = !attached || this.compacting;
     ($("autocompact-save") as HTMLButtonElement).disabled = !attached;
   }

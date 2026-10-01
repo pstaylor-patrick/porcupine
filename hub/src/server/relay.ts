@@ -53,6 +53,11 @@ export class BrowserRelay {
     this.send({ t: "sessions", sessions: this.registry.list() });
   }
 
+  /** Hub-originated notice shown in every attached app (budget warnings). */
+  notice(level: "info" | "warn" | "error", text: string): void {
+    this.send({ t: "notice", level, text });
+  }
+
   sessionEnded(id: string): void {
     if (this.session === id) {
       this.send({ t: "session_ended", session: id });

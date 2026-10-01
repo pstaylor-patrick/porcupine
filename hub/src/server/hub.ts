@@ -20,6 +20,10 @@ import { BrowserRelay, MAX_BROWSER_FRAME } from "./relay.js";
 import { MAX_UPLOAD_BYTES, RETENTION_DAYS, uploadConfig, type UploadConfig } from "./uploads/config.js";
 import { pruneUploads } from "./uploads/retention.js";
 import { handleUploads } from "./uploads/routes.js";
+import { usageConfig, type UsageConfig } from "./usage/config.js";
+import { handleUsage } from "./usage/routes.js";
+import { UsageService, type BudgetWarning } from "./usage/service.js";
+import type { FetchLike } from "./usage/openrouter.js";
 import { applySecurityHeaders, isPublicPath, serveStatic } from "./static.js";
 
 export interface HubOptions {
@@ -30,11 +34,15 @@ export interface HubOptions {
   rescanMs?: number;
   uploads?: UploadConfig;
   maxUploadBytes?: number;
+  usage?: UsageConfig;
+  usageFetch?: FetchLike;
+  onBudgetWarning?: (w: BudgetWarning) => void;
 }
 
 export interface Hub {
   server: Server;
   registry: Registry;
+  usage: UsageService;
   listen(): Promise<{ port: number }>;
   close(): Promise<void>;
 }
@@ -77,12 +85,26 @@ export function createHub(opts: HubOptions): Hub {
   const limiter = opts.limiter ?? new LoginRateLimiter({ perIp: 5, global: 20, windowMs: 15 * 60 * 1000, now });
   const secure = !config.dev;
   const relays = new Set<BrowserRelay>();
+  const usage = new UsageService({
+    config: opts.usage ?? usageConfig(process.env, homedir()),
+    now,
+    log,
+    fetch: opts.usageFetch,
+    onBudgetWarning: (w) => {
+      log(`budget warning: ${w.provider} ${String(w.threshold)}%`);
+      relays.forEach((r) => r.notice(w.threshold >= 100 ? "error" : "warn", w.text));
+      opts.onBudgetWarning?.(w);
+    },
+  });
   const registry = new Registry({
     runtimeDir: config.runtimeDir,
     log,
     rescanMs: opts.rescanMs ?? 5000,
     onChange: () => relays.forEach((r) => r.sessionsChanged()),
     onSessionEnded: (id) => relays.forEach((r) => r.sessionEnded(id)),
+    onEvent: (meta, seq, event) => {
+      if (event.type === "message_end") usage.record(event.message, { sessionId: meta.id, cwd: meta.cwd, seq });
+    },
   });
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_BROWSER_FRAME });
   wss.on("connection", (ws) => {
@@ -158,6 +180,7 @@ export function createHub(opts: HubOptions): Hub {
       return;
     }
     if (await handleUploads(req, res, uploadCtx)) return;
+    if (await handleUsage(req, res, { service: usage, origins: config.origins, authed, log })) return;
     if (path.startsWith("/api/")) {
       res.writeHead(404, { "Content-Type": "text/plain" }).end("not found\n");
       return;
@@ -204,6 +227,7 @@ export function createHub(opts: HubOptions): Hub {
   return {
     server,
     registry,
+    usage,
     async listen() {
       await registry.start();
       prune();
@@ -213,6 +237,9 @@ export function createHub(opts: HubOptions): Hub {
         server.once("error", reject);
         server.listen(config.port, config.host, () => resolve());
       });
+      setTimeout(() => {
+        usage.backfill(registry.list().map((x) => x.cwd)).catch((e: unknown) => log(`usage: backfill failed: ${(e as Error).message}`));
+      }, 0).unref();
       const addr = server.address();
       return { port: typeof addr === "object" && addr ? addr.port : config.port };
     },

@@ -48,7 +48,7 @@ beforeEach(async () => {
   mkdirSync(join(dir, "web", "crayon"));
   writeFileSync(join(dir, "web", "crayon", "scribble.svg"), "<svg/>");
   session = null;
-  hub = createHub({ config: config(), log: () => undefined, rescanMs: 100, uploads: uploadConfig({}, dir), maxUploadBytes: 1024 });
+  hub = createHub({ config: config(), log: () => undefined, rescanMs: 100, uploads: uploadConfig({}, dir), maxUploadBytes: 1024, usage: { dir: join(dir, "data"), piSessionsDir: join(dir, "pi-sessions"), openrouterKey: null } });
   const { port } = await hub.listen();
   base = `http://127.0.0.1:${port}`;
 });
@@ -197,6 +197,37 @@ describe("WebSocket upgrade", () => {
     const b = await browser();
     b.send({ t: "ping" });
     await b.until((f) => f.t === "pong");
+  });
+});
+
+describe("usage and budgets", () => {
+  it("requires auth", async () => {
+    expect((await fetch(`${base}/api/usage`)).status).toBe(401);
+    expect((await fetch(`${base}/api/budgets`)).status).toBe(401);
+    const r = await fetch(`${base}/api/budgets`, { method: "POST", headers: { Origin: ORIGIN }, body: "{}" });
+    expect(r.status).toBe(401);
+  });
+
+  it("rejects a bad or missing Origin on POST", async () => {
+    const body = JSON.stringify({ budgets: { anthropic: { kind: "monthly", amountUsd: 5 } } });
+    expect((await fetch(`${base}/api/budgets`, { method: "POST", headers: { Cookie: cookie(), Origin: "https://evil.example" }, body })).status).toBe(403);
+    expect((await fetch(`${base}/api/budgets`, { method: "POST", headers: { Cookie: cookie() }, body })).status).toBe(403);
+  });
+
+  it("saves, validates and reports budgets", async () => {
+    const headers = { Cookie: cookie(), Origin: ORIGIN, "Content-Type": "application/json" };
+    const bad = await fetch(`${base}/api/budgets`, { method: "POST", headers, body: JSON.stringify({ budgets: { x: { kind: "weekly", amountUsd: 1 } } }) });
+    expect(bad.status).toBe(400);
+    const big = await fetch(`${base}/api/budgets`, { method: "POST", headers, body: "x".repeat(20000) });
+    expect([400, 413]).toContain(big.status);
+    const ok = await fetch(`${base}/api/budgets`, { method: "POST", headers, body: JSON.stringify({ budgets: { anthropic: { kind: "monthly", amountUsd: 5 } } }) });
+    expect(ok.status).toBe(200);
+    const got = (await (await fetch(`${base}/api/budgets`, { headers: { Cookie: cookie() } })).json()) as { budgets: unknown };
+    expect(got.budgets).toEqual({ anthropic: { kind: "monthly", amountUsd: 5 } });
+    const usage = (await (await fetch(`${base}/api/usage`, { headers: { Cookie: cookie() } })).json()) as Record<string, unknown>;
+    expect(usage.openrouter).toBeNull();
+    expect(usage.status).toEqual([{ provider: "anthropic", kind: "monthly", amountUsd: 5, spentUsd: 0, pct: 0, live: false }]);
+    expect(Array.isArray(usage.daily)).toBe(true);
   });
 });
 
