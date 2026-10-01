@@ -165,32 +165,69 @@ export function buildAttachmentBlock(message: string, results: ProcessResult[]):
 
 const KIND_ICON: Record<Kind, string> = { image: "IMG", pdf: "PDF", audio: "AUD", video: "VID", text: "TXT", file: "FILE" };
 
-/** Renders chips with createElement only. */
+const thumbs = new Map<File, string>();
+
+/** An object URL for an image or video preview, cached per file and revoked once the file leaves the list. */
+function thumbFor(p: Pending): string | undefined {
+  if (p.kind !== "image" && p.kind !== "video") return undefined;
+  if (typeof URL.createObjectURL !== "function") return undefined;
+  let url = thumbs.get(p.file);
+  if (!url) {
+    url = URL.createObjectURL(p.file);
+    thumbs.set(p.file, url);
+  }
+  return url;
+}
+
+function pruneThumbs(pending: readonly Pending[]): void {
+  const live = new Set(pending.map((p) => p.file));
+  for (const [file, url] of thumbs) {
+    if (!live.has(file)) {
+      URL.revokeObjectURL(url);
+      thumbs.delete(file);
+    }
+  }
+}
+
+/** Renders square tiles with createElement only: a thumbnail for images and video, else the kind and name. */
 export function renderChips(container: HTMLElement, pending: readonly Pending[], onRemove: (index: number) => void, disabled = false): void {
+  pruneThumbs(pending);
   container.replaceChildren(
     ...pending.map((p, i) => {
       const chip = document.createElement("div");
       chip.className = "attach-chip";
       chip.dataset.kind = p.kind;
+      chip.title = p.file.name;
       if (p.warn) chip.dataset.warn = "true";
-      const icon = document.createElement("span");
-      icon.className = "chip-kind";
-      icon.textContent = KIND_ICON[p.kind];
-      icon.setAttribute("aria-hidden", "true");
-      const name = document.createElement("span");
-      name.className = "chip-name";
-      name.textContent = p.file.name;
-      name.title = p.file.name;
+      const url = thumbFor(p);
+      if (url && p.kind === "image") {
+        const img = document.createElement("img");
+        img.className = "chip-thumb";
+        img.src = url;
+        img.alt = "";
+        chip.append(img);
+      } else if (url) {
+        const vid = document.createElement("video");
+        vid.className = "chip-thumb";
+        vid.src = `${url}#t=0.1`;
+        vid.muted = true;
+        vid.playsInline = true;
+        vid.preload = "metadata";
+        chip.append(vid);
+      } else {
+        const icon = document.createElement("span");
+        icon.className = "chip-kind";
+        icon.textContent = KIND_ICON[p.kind];
+        icon.setAttribute("aria-hidden", "true");
+        const name = document.createElement("span");
+        name.className = "chip-name";
+        name.textContent = p.file.name;
+        chip.append(icon, name);
+      }
       const meta = document.createElement("span");
       meta.className = "chip-meta";
-      meta.textContent = p.progress ?? formatBytes(p.file.size);
-      chip.append(icon, name, meta);
-      if (p.warn) {
-        const w = document.createElement("span");
-        w.className = "chip-warn";
-        w.textContent = p.warn;
-        chip.append(w);
-      }
+      meta.textContent = p.warn ?? p.progress ?? formatBytes(p.file.size);
+      chip.append(meta);
       const x = document.createElement("button");
       x.type = "button";
       x.className = "chip-remove";

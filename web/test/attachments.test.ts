@@ -122,7 +122,8 @@ describe("DOM", () => {
     expect(box.hidden).toBe(false);
     const chip = box.querySelector(".attach-chip") as HTMLElement;
     expect(chip.dataset.warn).toBe("true");
-    expect(chip.querySelector(".chip-name")?.textContent).toBe("a.png");
+    expect(chip.title).toBe("a.png");
+    expect(chip.querySelector(".chip-meta")?.textContent).toBe("Too large");
     (chip.querySelector(".chip-remove") as HTMLButtonElement).click();
     expect(onRemove).toHaveBeenCalledWith(0);
     renderChips(box, [], onRemove);
