@@ -1250,8 +1250,15 @@ function pinToVisualViewport(): void {
   const sync = (): void => {
     const el = document.activeElement;
     const typing = el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && el.type !== "checkbox" && el.type !== "radio");
-    if (typing) document.documentElement.style.setProperty("--app-height", `${vv.height}px`);
-    else document.documentElement.style.removeProperty("--app-height");
+    const root = document.documentElement.style;
+    if (typing) {
+      root.setProperty("--app-height", `${vv.height}px`);
+      // Bottom sheets are fixed to the layout viewport, which the keyboard covers; lift them above it.
+      root.setProperty("--kb-inset", `${Math.max(0, window.innerHeight - vv.height - vv.offsetTop)}px`);
+    } else {
+      root.removeProperty("--app-height");
+      root.removeProperty("--kb-inset");
+    }
     if (window.scrollY !== 0) window.scrollTo(0, 0);
     // Settings scroll internally; keep the focused field above the keyboard.
     if (typing && el.closest(".settings, .sheet")) el.scrollIntoView({ block: "center" });

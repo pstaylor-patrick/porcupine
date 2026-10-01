@@ -202,7 +202,7 @@ select {
 .sheet {
   position: fixed;
   z-index: 40;
-  left: 0; right: 0; bottom: 0;
+  left: 0; right: 0; bottom: var(--kb-inset, 0px);
   max-height: min(85dvh, var(--app-height, 100dvh));
   display: flex;
   flex-direction: column;
