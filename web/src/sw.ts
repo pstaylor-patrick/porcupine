@@ -51,7 +51,9 @@ sw.addEventListener("fetch", (e) => {
             const copy = res.clone();
             void caches.open(CACHE).then((c) => c.put("/", copy));
           }
-          return res;
+          // Safari shows a blank page when a service worker answers a navigation
+          // with a redirected response, so hand the redirect back to the browser.
+          return res.redirected ? Response.redirect(res.url, 303) : res;
         })
         .catch(() => caches.match("/").then((hit) => hit ?? Response.error())),
     );
