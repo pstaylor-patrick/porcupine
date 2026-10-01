@@ -166,12 +166,12 @@
       </section>
       <section class="settings-section" aria-labelledby="budgets-title">
         <h3 id="budgets-title" class="settings-subtitle">Budgets</h3>
-        <p class="field-hint">Monthly caps count local spend this calendar month. Balance uses OpenRouter's live usage when available. Warnings at 80% and 100%; prompts are never blocked.</p>
+        <p class="field-hint">Warns at 80% and 100%. Never blocks prompts.</p>
         <form id="budget-form" class="budget-form" autocomplete="off">
           <div id="budget-rows"></div>
-          <div class="context-row">
-            <button id="budget-add" type="button" class="secondary">Add budget</button>
-            <button id="budget-save" type="submit" class="secondary">Save budgets</button>
+          <div class="budget-actions">
+            <button id="budget-add" type="button" class="secondary">Add</button>
+            <button id="budget-save" type="submit" class="primary">Save</button>
           </div>
           <p id="budget-status" class="field-hint" role="status" aria-live="polite"></p>
         </form>

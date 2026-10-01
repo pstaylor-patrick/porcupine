@@ -50,11 +50,12 @@ describe("usage helpers", () => {
   it("renders providers, progress and the unavailable OpenRouter balance", () => {
     const root = document.createElement("div");
     renderUsage(root, report());
-    expect(root.querySelector("progress")?.value).toBe(90);
-    expect(root.querySelector("progress")?.classList.contains("near")).toBe(true);
+    const bar = root.querySelector<HTMLElement>(".ctx-bar");
+    expect(bar?.getAttribute("aria-valuenow")).toBe("90");
+    expect(bar?.dataset.level).toBe("high");
     expect(root.textContent).toContain("OpenRouter balance: unavailable");
-    expect(root.querySelector("details li")?.textContent).toContain("claude");
-    expect(root.querySelector("[style]")).toBeNull();
+    expect(root.querySelector(".usage-models li")?.textContent).toContain("claude");
+    expect([...root.querySelectorAll("[style]")].every((e) => e.classList.contains("ctx-fill"))).toBe(true);
   });
 
   it("round-trips the budget form and rejects bad input", () => {

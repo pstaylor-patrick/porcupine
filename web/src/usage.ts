@@ -91,10 +91,10 @@ export function dailyChart(daily: { day: string; costUsd: number }[]): SVGSVGEle
 }
 
 function progressFor(s: UsageReport["status"][number]): HTMLElement {
-  const p = el("progress", { max: "100", class: "usage-progress" });
-  p.value = Math.min(s.pct, 100);
-  if (s.pct >= 100) p.classList.add("over");
-  else if (s.pct >= 80) p.classList.add("near");
+  const pct = Math.min(Math.max(s.pct, 0), 100);
+  const p = el("div", { class: "ctx-bar", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(pct)) }, el("span", { class: "ctx-fill" }));
+  (p.firstElementChild as HTMLElement).style.width = `${String(pct)}%`;
+  if (s.pct >= 80) p.dataset.level = "high";
   const label = `${formatUsd(s.spentUsd)} of ${formatUsd(s.amountUsd)} ${s.kind === "monthly" ? "this month" : s.live ? "balance (live)" : "balance (local estimate)"} - ${String(Math.round(s.pct))}%`;
   p.setAttribute("aria-label", `${s.provider} budget: ${label}`);
   return el("div", { class: "usage-budget" }, p, el("p", { class: "field-hint" }, label));
@@ -111,13 +111,12 @@ export function renderUsage(root: HTMLElement, r: UsageReport): void {
     const card = el("div", { class: "usage-provider" });
     card.append(
       el("div", { class: "usage-row" }, el("strong", {}, name), el("span", {}, `${formatUsd(p?.costUsd ?? 0)} this month`)),
-      el("p", { class: "field-hint" }, `${formatTokens(p?.input ?? 0)} in, ${formatTokens(p?.output ?? 0)} out`),
     );
     if (s) card.append(progressFor(s));
     if (p && p.models.length > 0) {
       const list = el("ul", { class: "usage-models" });
-      for (const m of p.models) list.append(el("li", {}, el("span", {}, m.model), el("span", {}, formatUsd(m.costUsd))));
-      card.append(el("details", {}, el("summary", {}, `${String(p.models.length)} model${p.models.length === 1 ? "" : "s"}`), list));
+      for (const m of p.models) list.append(el("li", {}, el("span", {}, m.model.replace(/^~/, "")), el("span", {}, formatUsd(m.costUsd))));
+      card.append(list);
     }
     root.append(card);
   }
@@ -130,8 +129,10 @@ export function renderUsage(root: HTMLElement, r: UsageReport): void {
         ? `OpenRouter balance: ${formatUsd(or.limitRemaining)} left of ${formatUsd(or.limit ?? 0)}`
         : `OpenRouter usage: ${formatUsd(or.usage ?? 0)} (no limit set)`;
   if (orText) root.append(el("p", { class: "field-hint" }, orText));
-  root.append(el("p", { class: "field-label" }, `Daily spend, last ${String(r.daily.length)} days`), dailyChart(r.daily));
-  root.append(el("p", { class: "field-hint" }, "Costs are pi's estimates. Budgets only warn; prompts are never blocked."));
+  // A chart needs at least two days with spend to show a trend; until then it is just empty space.
+  if (r.daily.filter((d) => d.costUsd > 0).length >= 2) {
+    root.append(el("p", { class: "field-label" }, `Daily spend, last ${String(r.daily.length)} days`), dailyChart(r.daily));
+  }
 }
 
 /** One editable budget row. */
@@ -142,7 +143,7 @@ function budgetRow(provider: string, b: Budget | null): HTMLElement {
   kind.value = b?.kind ?? (provider === "openrouter" ? "balance" : "monthly");
   const amount = el("input", { type: "number", class: "budget-amount", min: "0.01", step: "0.01", inputmode: "decimal", "aria-label": "Amount in USD", placeholder: "USD" });
   amount.value = b ? String(b.amountUsd) : "";
-  const remove = el("button", { type: "button", class: "secondary budget-remove", "aria-label": "Remove budget" }, "Remove");
+  const remove = el("button", { type: "button", class: "budget-remove", "aria-label": "Remove budget" }, "✕");
   const row = el("div", { class: "budget-row" }, name, kind, amount, remove);
   remove.addEventListener("click", () => row.remove());
   return row;
