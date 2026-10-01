@@ -261,7 +261,11 @@ export class App {
     $("logout").addEventListener("click", () => void this.logout());
     $("reload-app").addEventListener("click", () => void reloadLatest());
     $("push-toggle").addEventListener("change", (e) => void this.togglePush((e.target as HTMLInputElement).checked));
-    $("budget-add").addEventListener("click", () => addBudgetRow($("budget-rows")));
+    $("budget-add").addEventListener("click", () => {
+      const row = addBudgetRow($("budget-rows"));
+      if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
+      else $("budget-status").textContent = "Every provider already has a budget.";
+    });
     $("budget-form").addEventListener("submit", (e) => {
       e.preventDefault();
       void this.saveBudgets();
@@ -1233,6 +1237,8 @@ function pinToVisualViewport(): void {
     if (typing) document.documentElement.style.setProperty("--app-height", `${vv.height}px`);
     else document.documentElement.style.removeProperty("--app-height");
     if (window.scrollY !== 0) window.scrollTo(0, 0);
+    // Settings scroll internally; keep the focused field above the keyboard.
+    if (typing && el.closest(".settings, .sheet")) el.scrollIntoView({ block: "center" });
   };
   vv.addEventListener("resize", sync);
   vv.addEventListener("scroll", sync);

@@ -6,6 +6,7 @@ import {
   formatUsd,
   parseSessionUsage,
   readBudgetForm,
+  addBudgetRow,
   renderBudgetForm,
   renderUsage,
   sessionUsageText,
@@ -66,6 +67,15 @@ describe("usage helpers", () => {
     const amt = rows.querySelectorAll<HTMLInputElement>(".budget-amount")[1];
     if (amt) amt.value = "-3";
     expect(readBudgetForm(rows)).toMatch(/positive/);
+  });
+
+  it("picks providers from a list and adds each at most once", () => {
+    const rows = document.createElement("div");
+    renderBudgetForm(rows, {}, ["openrouter"]);
+    expect(rows.querySelector(".budget-provider")?.tagName).toBe("SELECT");
+    expect(addBudgetRow(rows)?.querySelector("select")?.value).toBe("anthropic");
+    expect(addBudgetRow(rows)?.querySelector("select")?.value).toBe("openai");
+    expect(addBudgetRow(rows)).toBeNull();
   });
 
   it("raises a banner at 80% and above", () => {

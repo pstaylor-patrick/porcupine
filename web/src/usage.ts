@@ -135,9 +135,18 @@ export function renderUsage(root: HTMLElement, r: UsageReport): void {
   }
 }
 
+/** Providers Porcupine has keys for; a budget picks from these rather than free text. */
+export const BUDGET_PROVIDERS = ["openrouter", "anthropic", "openai"] as const;
+
+function usedProviders(rows: HTMLElement): Set<string> {
+  return new Set([...rows.querySelectorAll<HTMLSelectElement>(".budget-provider")].map((s) => s.value));
+}
+
 /** One editable budget row. */
 function budgetRow(provider: string, b: Budget | null): HTMLElement {
-  const name = el("input", { type: "text", class: "budget-provider", "aria-label": "Provider", placeholder: "provider", autocomplete: "off" });
+  const known: readonly string[] = BUDGET_PROVIDERS;
+  const options = known.includes(provider) ? known : [provider, ...known];
+  const name = el("select", { class: "budget-provider", "aria-label": "Provider" }, ...options.map((o) => el("option", { value: o }, o)));
   name.value = provider;
   const kind = el("select", { class: "budget-kind", "aria-label": "Budget kind" }, el("option", { value: "monthly" }, "Monthly"), el("option", { value: "balance" }, "Balance"));
   kind.value = b?.kind ?? (provider === "openrouter" ? "balance" : "monthly");
@@ -153,22 +162,28 @@ export function renderBudgetForm(rows: HTMLElement, budgets: Record<string, Budg
   rows.replaceChildren();
   const names = new Set([...Object.keys(budgets), ...providers]);
   for (const n of names) rows.append(budgetRow(n, budgets[n] ?? null));
-  if (names.size === 0) rows.append(budgetRow("", null));
+  if (names.size === 0) addBudgetRow(rows);
 }
 
-export function addBudgetRow(rows: HTMLElement): void {
-  rows.append(budgetRow("", null));
+/** Adds a row for the first provider without one; returns it, or null when every provider has a row. */
+export function addBudgetRow(rows: HTMLElement): HTMLElement | null {
+  const used = usedProviders(rows);
+  const next = BUDGET_PROVIDERS.find((p) => !used.has(p));
+  if (!next) return null;
+  const row = budgetRow(next, null);
+  rows.append(row);
+  return row;
 }
 
 /** Reads the form; rows with an empty amount are dropped. Returns an error string on invalid input. */
 export function readBudgetForm(rows: HTMLElement): Record<string, Budget> | string {
   const out: Record<string, Budget> = {};
   for (const row of rows.querySelectorAll<HTMLElement>(".budget-row")) {
-    const provider = (row.querySelector(".budget-provider") as HTMLInputElement).value.trim().toLowerCase();
+    const provider = (row.querySelector(".budget-provider") as HTMLSelectElement).value;
     const kind = (row.querySelector(".budget-kind") as HTMLSelectElement).value as BudgetKind;
     const raw = (row.querySelector(".budget-amount") as HTMLInputElement).value.trim();
     if (raw === "") continue;
-    if (provider === "") return "Every budget needs a provider.";
+    if (provider in out) return `${provider} has two budgets.`;
     const amountUsd = Number(raw);
     if (!Number.isFinite(amountUsd) || amountUsd <= 0) return `${provider}: amount must be a positive number.`;
     out[provider] = { kind, amountUsd };
