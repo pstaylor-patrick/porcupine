@@ -139,9 +139,9 @@ export function renderUsage(root: HTMLElement, r: UsageReport): void {
 function budgetRow(provider: string, b: Budget | null): HTMLElement {
   const name = el("input", { type: "text", class: "budget-provider", "aria-label": "Provider", placeholder: "provider", autocomplete: "off" });
   name.value = provider;
-  const kind = el("select", { class: "budget-kind", "aria-label": "Budget kind" }, el("option", { value: "monthly" }, "monthly"), el("option", { value: "balance" }, "balance"));
+  const kind = el("select", { class: "budget-kind", "aria-label": "Budget kind" }, el("option", { value: "monthly" }, "Monthly"), el("option", { value: "balance" }, "Balance"));
   kind.value = b?.kind ?? (provider === "openrouter" ? "balance" : "monthly");
-  const amount = el("input", { type: "number", class: "budget-amount", min: "0.01", step: "0.01", inputmode: "decimal", "aria-label": "Amount in USD", placeholder: "USD" });
+  const amount = el("input", { type: "number", class: "budget-amount", min: "0.01", step: "0.01", inputmode: "decimal", "aria-label": "Amount in USD", placeholder: "$ amount" });
   amount.value = b ? String(b.amountUsd) : "";
   const remove = el("button", { type: "button", class: "budget-remove", "aria-label": "Remove budget" }, "✕");
   const row = el("div", { class: "budget-row" }, name, kind, amount, remove);

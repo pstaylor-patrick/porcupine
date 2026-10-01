@@ -516,7 +516,11 @@ details > :not(summary) { padding: 0 12px 10px; }
 .usage-models li span:first-child { overflow-wrap: anywhere; }
 .usage-chart { display: block; width: 100%; height: 80px; margin-top: 4px; }
 .usage-bar { fill: var(--crayon); }
-.budget-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.9fr) 36px; gap: 8px; align-items: center; margin-bottom: 8px; }
+.budget-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; grid-template-areas: "name name remove" "kind amount ."; gap: 8px; align-items: center; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+.budget-row .budget-provider { grid-area: name; font-weight: 600; }
+.budget-row .budget-kind { grid-area: kind; }
+.budget-row .budget-amount { grid-area: amount; }
+.budget-row .budget-remove { grid-area: remove; }
 .budget-row input, .budget-row select { min-width: 0; width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; font-size: 16px; }
 .budget-remove { width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 14px; cursor: pointer; }
 .budget-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
