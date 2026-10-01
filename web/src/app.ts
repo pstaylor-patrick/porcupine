@@ -173,6 +173,8 @@ export function buildPrompt(
 
 export { filterModels, type ModelInfo } from "./models.js";
 
+const RECENT_RAIL_KEY = "__recent";
+
 const SHEET_MESSAGES: Record<Exclude<SheetState, "ready" | "error">, string> = {
   detached: "Not attached: pick a session",
   loading: "Loading models",
@@ -226,6 +228,8 @@ export class App {
   private readonly returnFocus = new Map<Overlay, HTMLElement | null>();
   /** Selected capability chips; memory only, kept across sheet open and close. */
   private readonly caps = new Set<Capability>();
+  /** Vendor selected in the desktop rail; null picks the current model's vendor. */
+  private railVendor: string | null = null;
   private modelsRequest: Promise<void> | null = null;
   /** Session the in-flight model request was sent for; a response for another session is dropped. */
   private modelsFor: string | null = null;
@@ -1468,6 +1472,15 @@ export class App {
       ? vendorOf(this.model.id, this.model.provider)
       : null;
     const grouped = groupByVendor(shown);
+    const jump = $("vendor-jump") as HTMLSelectElement;
+    if (this.isDesktop()) {
+      recent.hidden = true;
+      jump.replaceChildren();
+      jump.hidden = true;
+      this.renderVendorRail(groups, grouped, recentModels, currentVendor);
+      return;
+    }
+    groups.classList.remove("model-rail-layout");
     groups.replaceChildren(
       ...grouped.map((g) => {
         const details = document.createElement("details");
@@ -1490,7 +1503,6 @@ export class App {
       }),
     );
 
-    const jump = $("vendor-jump") as HTMLSelectElement;
     const placeholder = document.createElement("option");
     placeholder.value = "";
     placeholder.textContent = "Jump to vendor";
@@ -1505,6 +1517,96 @@ export class App {
     );
     jump.value = "";
     jump.hidden = grouped.length < 2;
+  }
+
+  /** Desktop picker: a vendor rail (Recently used first) beside the selected vendor's models. */
+  private renderVendorRail(
+    groups: HTMLElement,
+    grouped: ReturnType<typeof groupByVendor>,
+    recentModels: ModelInfo[],
+    currentVendor: string | null,
+  ): void {
+    const entries: { key: string; label: string; models: ModelInfo[] }[] = [];
+    if (recentModels.length > 0)
+      entries.push({
+        key: RECENT_RAIL_KEY,
+        label: "Recently used",
+        models: recentModels,
+      });
+    for (const g of grouped)
+      entries.push({
+        key: g.vendor,
+        label: `${g.vendor} (${g.count})`,
+        models: g.models,
+      });
+    groups.classList.toggle("model-rail-layout", entries.length > 0);
+    if (entries.length === 0) {
+      groups.replaceChildren();
+      return;
+    }
+    const has = (k: string | null) =>
+      k !== null && entries.some((e) => e.key === k);
+    if (!has(this.railVendor))
+      this.railVendor = has(currentVendor)
+        ? currentVendor
+        : (grouped[0]?.vendor ?? entries[0]!.key);
+    const selected = entries.find((e) => e.key === this.railVendor)!;
+
+    const rail = document.createElement("div");
+    rail.className = "vendor-rail";
+    rail.setAttribute("role", "tablist");
+    rail.setAttribute("aria-label", "Vendors");
+    rail.setAttribute("aria-orientation", "vertical");
+    const tabs = entries.map((e) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "vendor-tab";
+      b.setAttribute("role", "tab");
+      b.dataset.vendor = e.key;
+      b.id = `vendor-tab-${e.key}`;
+      b.setAttribute("aria-controls", "vendor-pane");
+      const on = e === selected;
+      b.setAttribute("aria-selected", on ? "true" : "false");
+      b.tabIndex = on ? 0 : -1;
+      b.textContent = e.label;
+      b.addEventListener("click", () => {
+        this.railVendor = e.key;
+        this.renderModels();
+        groups
+          .querySelector<HTMLButtonElement>(
+            `.vendor-tab[data-vendor="${CSS.escape(e.key)}"]`,
+          )
+          ?.focus();
+      });
+      return b;
+    });
+    rail.addEventListener("keydown", (ev) => {
+      const i = tabs.indexOf(document.activeElement as HTMLButtonElement);
+      if (i < 0) return;
+      const next =
+        ev.key === "ArrowDown"
+          ? tabs[(i + 1) % tabs.length]
+          : ev.key === "ArrowUp"
+            ? tabs[(i - 1 + tabs.length) % tabs.length]
+            : undefined;
+      if (!next) return;
+      ev.preventDefault();
+      next.click();
+    });
+    rail.append(...tabs);
+
+    const pane = document.createElement("div");
+    pane.className = "vendor-pane";
+    pane.id = "vendor-pane";
+    pane.setAttribute("role", "tabpanel");
+    pane.setAttribute("aria-labelledby", `vendor-tab-${selected.key}`);
+    const ul = document.createElement("ul");
+    ul.className = "model-list";
+    ul.setAttribute("role", "listbox");
+    ul.setAttribute("aria-label", selected.label);
+    ul.append(...selected.models.map((m) => this.modelOption(m)));
+    pane.append(ul);
+    groups.replaceChildren(rail, pane);
   }
 
   private buildChips(): void {

@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment happy-dom
+import { describe, expect, it, vi } from "vitest";
+import { App } from "../src/app.js";
+import { Connection } from "../src/ws.js";
+import { loadShell } from "./dom.js";
 import {
   CAPABILITIES,
   CHEAP_INPUT_MAX,
@@ -288,5 +292,88 @@ describe("recents", () => {
     const s = memStorage();
     s.data.set(RECENT_KEY, JSON.stringify(["anthropic/claude-opus-5.5", "zai/glm-5"]));
     expect(pushRecent(s, `${OR}|zai/glm-5`, models, OR)).toEqual([`${OR}|zai/glm-5`, `${OR}|anthropic/claude-opus-5.5`]);
+  });
+});
+
+describe("model picker vendor rail", () => {
+  const models = [
+    { provider: "g", id: "anthropic/claude-opus-5.5", reasoning: true, input: ["text", "image"] },
+    { provider: "g", id: "anthropic/claude-haiku-5", reasoning: false, input: ["text"] },
+    { provider: "g", id: "openai/gpt-5", reasoning: true, input: ["text"] },
+    { provider: "g", id: "zai/glm-5", reasoning: false, input: ["text"] },
+  ];
+  async function setup(desktop: boolean) {
+    localStorage.clear();
+    localStorage.setItem(RECENT_KEY, JSON.stringify(["g|zai/glm-5"]));
+    loadShell();
+    const conn = new Connection(
+      { url: "ws://x/ws", storage: null },
+      { onFrame: () => undefined, onStatus: () => undefined },
+    );
+    vi.spyOn(conn, "command").mockImplementation((cmd) =>
+      Promise.resolve(
+        cmd.type === "get_available_models"
+          ? { success: true, data: { models } }
+          : { success: true },
+      ),
+    );
+    const app = new App(conn);
+    app.isDesktop = () => desktop;
+    app.bind();
+    conn.sessionId = "s1";
+    app.openSheet();
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll("#model-groups .model-option").length).toBeGreaterThan(0),
+    );
+    return { app };
+  }
+  const tabs = () =>
+    [...document.querySelectorAll<HTMLButtonElement>("#model-groups .vendor-tab")];
+  const shown = () =>
+    [...document.querySelectorAll("#vendor-pane .model-option-name")].map((n) => n.textContent);
+  const selected = () => tabs().find((t) => t.getAttribute("aria-selected") === "true")?.dataset.vendor;
+
+  it("lists Recently used then vendors with counts and hides the vendor select", async () => {
+    await setup(true);
+    expect(tabs().map((t) => t.textContent)).toEqual([
+      "Recently used",
+      "anthropic (2)",
+      "openai (1)",
+      "zai (1)",
+    ]);
+    expect(document.querySelector("#model-groups [role=tablist]")).not.toBeNull();
+    expect((document.getElementById("vendor-jump") as HTMLSelectElement).hidden).toBe(true);
+    expect(document.getElementById("vendor-jump")!.querySelectorAll("option")).toHaveLength(0);
+    expect(document.querySelectorAll("#model-groups details")).toHaveLength(0);
+    expect(document.getElementById("model-recent")!.hidden).toBe(true);
+  });
+
+  it("swaps the model list when a vendor is clicked", async () => {
+    await setup(true);
+    tabs().find((t) => t.dataset.vendor === "anthropic")!.click();
+    expect(selected()).toBe("anthropic");
+    expect(shown()).toEqual(["anthropic/claude-opus-5.5", "anthropic/claude-haiku-5"]);
+    tabs()[0]!.click();
+    expect(shown()).toEqual(["zai/glm-5"]);
+  });
+
+  it("filter narrows the rail and moves the selection to a matching vendor", async () => {
+    await setup(true);
+    tabs().find((t) => t.dataset.vendor === "zai")!.click();
+    const filter = document.getElementById("model-filter") as HTMLInputElement;
+    filter.value = "claude";
+    filter.dispatchEvent(new Event("input"));
+    expect(tabs().map((t) => t.textContent)).toEqual(["anthropic (2)"]);
+    expect(selected()).toBe("anthropic");
+    expect(shown()).toHaveLength(2);
+  });
+
+  it("keeps the vendor select and groups on phones", async () => {
+    await setup(false);
+    expect(tabs()).toHaveLength(0);
+    const jump = document.getElementById("vendor-jump") as HTMLSelectElement;
+    expect(jump.hidden).toBe(false);
+    expect(jump.options).toHaveLength(4);
+    expect(document.querySelectorAll("#model-groups details")).toHaveLength(3);
   });
 });

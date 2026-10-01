@@ -666,3 +666,15 @@ details > :not(summary) { padding: 0 12px 10px; }
 .ask-wizard .question[hidden] { display: none; }
 .queue-actions { display: inline-flex; gap: 4px; margin-left: auto; }
 .queue-action { min-width: 32px; min-height: 32px; padding: 0 8px; font-size: 14px; line-height: 1; }
+
+/* Desktop model picker: vendor rail beside the selected vendor's models. */
+@media (min-width: 900px) {
+  .model-browser:has(.model-rail-layout) { overflow: hidden; display: flex; min-height: 240px; }
+  .model-groups.model-rail-layout { display: grid; grid-template-columns: minmax(120px, 34%) minmax(0, 1fr); flex: 1 1 auto; min-height: 0; width: 100%; }
+  .vendor-rail { display: flex; flex-direction: column; overflow-y: auto; border-right: 1px solid var(--line); padding: 4px; gap: 2px; }
+  .vendor-tab { min-height: 36px; padding: 0 10px; text-align: left; border: 0; border-radius: 8px; background: none; color: var(--fg); font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+  .vendor-tab:hover { background: var(--code); }
+  .vendor-tab[aria-selected="true"] { background: var(--code); font-weight: 600; }
+  .vendor-tab:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .vendor-pane { overflow-y: auto; min-height: 0; }
+}
